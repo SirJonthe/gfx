@@ -1,0 +1,22 @@
+BUGS
+
+1)	Fix texture coordinate bug in stream blitter. Try animating. See
+	normal blitter for reference of how to fix. (Something along the
+	lines of u = u + sx*-pDst).
+2)	Blitting does not render last pixel of source i.e. [width-1] and
+	[height-1]. THINK THIS IS FIXED!
+	
+FEATURES
+1)	Add support for rotations. This will not be blitting by definition,
+	but rather polygon rendering. Also, add support for custom sampling
+	and blit predicates.
+2)	Bilinear sampling + alpha blending/color key looks horrible. See
+	if there is a workaround that does not involve big performance
+	tradeoff.
+3)	Find a more elegant solution to the problem regarding objects as
+ 	default arguments (static globals cause access violation).
+4)	4x FSAA does not work properly. 2x works fine.
+5)	Add support for "moving" blocks of pixels to another destination
+	of the buffer without allocating an intermediate buffer. Good
+	for streaming, since the point of streaming is to keep memory
+	consumption down and also keeps streaming to a minimum.

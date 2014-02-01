@@ -1,0 +1,14 @@
+gfx.h
+gfx.cpp
+
+Copyright © Jonathan Karlsson 2010
+
+A simple software graphics rendering library layered on top
+of SDL. Allows stretching and texture filtering, as well as
+custom rendering routines. Utilizes completely rewritten
+graphics routines. For additional functionality SDL can still
+be used.
+
+Library is free to use for commercial and non-commercial purposes.
+The author retains his moral rights under the applicable copyright
+laws (i.e. credit the author where credit is due).
