@@ -765,8 +765,8 @@ void cc0::gfx::stretch_image(cc0::gfx::Image &dst, cc0::gfx::Rect dst_rect, cons
 		ssy += dsy * (dst_rect.a.y - write_rect.a.y);
 		dst_rect.a.y = write_rect.a.y;
 	}
-	const int32_t esx = max(src_rect.a.x, src_rect.b.x) << 15;
-	const int32_t esy = max(src_rect.a.y, src_rect.b.y) << 15;
+	const int32_t esx = (max(src_rect.a.x, src_rect.b.x) << 15) - abs(dsx);
+	const int32_t esy = (max(src_rect.a.y, src_rect.b.y) << 15) - abs(dsy);
 	for (int32_t dy = dst_rect.a.y, sy = 0; dy < dst_rect.b.y; ++dy, sy += abs(dsy)) {
 		for (int32_t dx = dst_rect.a.x, sx = 0; dx < dst_rect.b.x; ++dx, sx += abs(dsx)) {
 			set_color(
@@ -775,8 +775,8 @@ void cc0::gfx::stretch_image(cc0::gfx::Image &dst, cc0::gfx::Rect dst_rect, cons
 				get_color(
 					src,
 					Point{
-						(dsx >= 0 ? ssx + sx : esx - sx - abs(dsx)) >> 15,
-						(dsy >= 0 ? ssy + sy : esy - sy - abs(dsy)) >> 15
+						(dsx >= 0 ? ssx + sx : esx - sx) >> 15,
+						(dsy >= 0 ? ssy + sy : esy - sy) >> 15
 					}
 				)
 			);
