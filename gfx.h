@@ -424,7 +424,8 @@ namespace cc0
 		/// @param dst_rect The region to fill.
 		/// @param color The input color.
 		/// @param shader The shader to use to blend colors.
-		void fill_rect(Image &dst, Rect dst_rect, RGBA32 color, Shader shader = shade_set);
+		/// @param write_rect The area on the destination image that is writeable. All rendering outside this area is discarded. The entire destination image is selected by default. The region is automatically clipped to the maximally allowed dimensions on the destination image.
+		void fill_rect(Image &dst, Rect dst_rect, RGBA32 color, Shader shader = shade_set, Rect write_rect = Rect{ Point{ 0, 0 }, Point{ Image::MAX_DIMENSION, Image::MAX_DIMENSION } });
 
 		/// @brief Draws a line between the two specified points using the two specified colors and the specified predicate (normal assignment is default).
 		/// @param pDst The destination image.

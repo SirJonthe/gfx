@@ -76,6 +76,47 @@ static uint8_t FONT_ATLAS[] = { // The font bits as 1 bit per pixel.
 	0x3e, 0x3e, 0x3e, 0x00
 };
 
+template < typename type_t >
+void swap(type_t &a, type_t &b)
+{
+	type_t t = a;
+	a = b;
+	b = t;
+}
+
+template < typename type_t >
+type_t min(type_t a, type_t b)
+{
+	return a < b ? a : b;
+}
+
+template < typename type_t >
+type_t max(type_t a, type_t b)
+{
+	return a > b ? a : b;
+}
+
+template < typename type_t >
+type_t clamp(type_t min, type_t x, type_t max)
+{
+	return ::max(min, ::min(x, max));
+}
+
+cc0::gfx::Rect order(cc0::gfx::Rect r)
+{
+	if (r.a.x > r.b.x) { swap(r.a.x, r.b.x); }
+	if (r.a.y > r.b.y) { swap(r.a.y, r.b.x); }
+	return r;
+}
+
+cc0::gfx::Rect clip(cc0::gfx::Rect a, cc0::gfx::Rect b)
+{
+	return cc0::gfx::Rect{
+		cc0::gfx::Point{ max(a.a.x, b.a.x), max(a.a.y, b.a.y) },
+		cc0::gfx::Point{ min(a.b.x, b.b.x), min(a.b.y, b.b.y) }
+	};
+}
+
 int32_t cc0::gfx::index_linear(const cc0::gfx::Image &src, cc0::gfx::Point p)
 {
 	return (src.width * p.y) + p.x;
@@ -575,13 +616,10 @@ void cc0::gfx::set_color(cc0::gfx::Image &dst, cc0::gfx::Point p, cc0::gfx::RGBA
 	dst.encode(dst, p, c);
 }
 
-void cc0::gfx::fill_rect(cc0::gfx::Image &dst, cc0::gfx::Rect dst_rect, cc0::gfx::RGBA32 color, cc0::gfx::Shader shader)
+void cc0::gfx::fill_rect(cc0::gfx::Image &dst, cc0::gfx::Rect dst_rect, cc0::gfx::RGBA32 color, cc0::gfx::Shader shader, Rect write_rect)
 {
-	dst_rect.a.x = 0          > dst_rect.a.x ? 0          : dst_rect.a.x;
-	dst_rect.a.y = 0          > dst_rect.a.y ? 0          : dst_rect.a.y;
-	dst_rect.b.x = dst.width  < dst_rect.b.x ? dst.width  : dst_rect.b.x;
-	dst_rect.b.y = dst.height < dst_rect.b.y ? dst.height : dst_rect.b.y;
-	
+	write_rect = clip(order(write_rect), Rect{ Point{ 0, 0 }, Point{ dst.width, dst.height } });
+	dst_rect = clip(order(dst_rect), write_rect);
 	for (int32_t y = dst_rect.a.y; y < dst_rect.b.y; ++y) {
 		for (int32_t x = dst_rect.a.x; x < dst_rect.b.x; ++x) {
 			const Point p = { x, y };
@@ -677,60 +715,20 @@ void cc0::gfx::draw_line(cc0::gfx::Image &pDst, int32_t pX1, int32_t pY1, cc0::g
 	}
 }
 
-template < typename type_t >
-void swap(type_t &a, type_t &b)
-{
-	type_t t = a;
-	a = b;
-	b = t;
-}
-
-template < typename type_t >
-type_t min(type_t a, type_t b)
-{
-	return a < b ? a : b;
-}
-
-template < typename type_t >
-type_t max(type_t a, type_t b)
-{
-	return a > b ? a : b;
-}
-
-template < typename type_t >
-type_t clamp(type_t min, type_t x, type_t max)
-{
-	return ::max(min, ::min(x, max));
-}
-
-cc0::gfx::Rect order(cc0::gfx::Rect r)
-{
-	if (r.a.x > r.b.x) { swap(r.a.x, r.b.x); }
-	if (r.a.y > r.b.y) { swap(r.a.y, r.b.x); }
-	return r;
-}
-
 void cc0::gfx::stretch_image(cc0::gfx::Image &dst, cc0::gfx::Rect dst_rect, const cc0::gfx::Image &src, cc0::gfx::Rect src_rect, cc0::gfx::Rect write_rect)
 {
 	// [ ] we need to test:
 	//	[ ] moving dst_rect off-screen in all orientations
 	//	[ ] ensure write_rect works
 
-	write_rect = order(write_rect);
-	clamp(0, write_rect.a.x, dst.width);
-	clamp(0, write_rect.b.x, dst.width);
-	clamp(0, write_rect.a.y, dst.height);
-	clamp(0, write_rect.b.y, dst.height);
+	write_rect = clip(order(write_rect), Rect{ Point{ 0, 0 }, Point{ dst.width, dst.height } });
 
 	if (src_rect.a.x == src_rect.b.x) { return; }
 	if (src_rect.a.y == src_rect.b.y) { return; }
 	if (dst_rect.a.x == dst_rect.b.x) { return; }
 	if (dst_rect.a.y == dst_rect.b.y) { return; }
 
-	clamp(0, src_rect.a.x, src.width);
-	clamp(0, src_rect.b.x, src.width);
-	clamp(0, src_rect.a.y, src.height);
-	clamp(0, src_rect.b.y, src.height);
+	src_rect = clip(src_rect, Rect{ Point{ 0, 0 }, Point{ src.width, src.height } });
 
 	if (dst_rect.a.x > dst_rect.b.x) {
 		swap(dst_rect.a.x, dst_rect.b.x);
@@ -788,21 +786,14 @@ void cc0::gfx::stretch_image(Image &dst, Rect dst_rect, const Image &src, Shader
 {
 	// [ ] We probably need to interpolate normalized texture coordinates because bilinear needs to interpolate 0 - width-1, while nearest needs to interpolate 0 - width.
 
-	write_rect = order(write_rect);
-	clamp(0, write_rect.a.x, dst.width);
-	clamp(0, write_rect.b.x, dst.width);
-	clamp(0, write_rect.a.y, dst.height);
-	clamp(0, write_rect.b.y, dst.height);
+	write_rect = clip(order(write_rect), Rect{ Point{ 0, 0 }, Point{ dst.width, dst.height } });
 
 	if (src_rect.a.x == src_rect.b.x) { return; }
 	if (src_rect.a.y == src_rect.b.y) { return; }
 	if (dst_rect.a.x == dst_rect.b.x) { return; }
 	if (dst_rect.a.y == dst_rect.b.y) { return; }
 
-	clamp(0, src_rect.a.x, src.width);
-	clamp(0, src_rect.b.x, src.width);
-	clamp(0, src_rect.a.y, src.height);
-	clamp(0, src_rect.b.y, src.height);
+	src_rect = clip(src_rect, Rect{ Point{ 0, 0 }, Point{ src.width, src.height } });
 
 	if (dst_rect.a.x > dst_rect.b.x) {
 		swap(dst_rect.a.x, dst_rect.b.x);
