@@ -400,12 +400,11 @@ namespace cc0
 		/// @param pixels The pointer to the image data, mainly containing colors, but could contain any image data.
 		/// @param width The width, in pixels, of the image.
 		/// @param height The height, in pixels, of the image.
-		/// @param bytes_per_pixel The number of bytes used per pixel. If the number of bytes used is less than one per pixel, or is variable, this should be 0.
 		/// @param encoder The encoder function that transforms a color from RGBA32 into the image's native format.
 		/// @param decoder The decoder function that transforms a color from the image's native format into RGBA32.
 		/// @param indexer The indexer function that transforms a 2D coordinate into a 1D pixel coordinate.
 		/// @return A new image.
-		Image new_image(void *pixels, int32_t width, int32_t height, int32_t bytes_per_pixel, Encoder encoder, Decoder decoder, Indexer indexer);
+		Image new_image(void *pixels, int32_t width, int32_t height, Encoder encoder, Decoder decoder, Indexer indexer);
 
 		/// @brief Returns a color at the given coordinates from an image.
 		/// @param src The image to get the color from.
@@ -469,6 +468,7 @@ namespace cc0
 		int32_t print_text(Image &dst, Point p, const char *text, int32_t text_len, RGBA32 color, int32_t scale = 1);
 
 		// [ ] draw_triangle
+		// [ ] draw a single vertical line (textued, untextured, color interpolated)
 	}
 }
 

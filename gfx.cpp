@@ -597,7 +597,7 @@ cc0::gfx::RGBA32 cc0::gfx::sample_bilinear(const cc0::gfx::Image &pImage, int32_
 	return rgba_bilerp(c00, c10, c01, c11, pU & 0x7fff, pV & 0x7fff);
 }
 
-cc0::gfx::Image cc0::gfx::new_image(void *pixels, int32_t width, int32_t height, int32_t bytes_per_pixel, cc0::gfx::Encoder encoder, cc0::gfx::Decoder decoder, cc0::gfx::Indexer indexer)
+cc0::gfx::Image cc0::gfx::new_image(void *pixels, int32_t width, int32_t height, cc0::gfx::Encoder encoder, cc0::gfx::Decoder decoder, cc0::gfx::Indexer indexer)
 {
 	return Image{
 		(uint8_t*)pixels,
