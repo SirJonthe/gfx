@@ -1,672 +1,876 @@
-//
-// gfx.cpp
-// Provides a simple interface for graphics using SDL.
-//
-// Copyright (c) Jonathan Karlsson 2010
-// Code may be used freely for commercial and non-commercial purposes.
-// Author retains his moral rights under the applicable copyright laws
-// (i.e. credit the author where credit is due).
-//
-
-#include <sstream>
-//#include <fstream>
-//#include <math.h>
-
 #include "gfx.h"
 
-//
-// Color arithmetic tables
-// Used for component based saturation arithmetic.
-//
-static Uint8 tableAdd[UCHAR_MAX+1][UCHAR_MAX+1];
-static Uint8 tableSub[UCHAR_MAX+1][UCHAR_MAX+1];
-static Uint8 tableMul[UCHAR_MAX+1][UCHAR_MAX+1];
-float u8chan_to_fchan[UCHAR_MAX+1];
+#define FONT_ATLAS_CHAR_WIDTH_COUNT   1 // The number of glyphs in the atlas in the X axis.
+#define FONT_ATLAS_CHAR_HEIGHT_COUNT 95 // The number of glyphs in the atlas in the Y axis.
+#define FONT_CHAR_PX_WIDTH            6 // The number of pixels in the glyph in the X axis.
+#define FONT_CHAR_PX_HEIGHT           8 // The number of pixels in the glyph in the Y axis.
+#define FONT_CELL_PX_WIDTH            8 // The number of pixels in the glyph (including unused pixels) in the X axis.
+#define FONT_CELL_PX_HEIGHT           8 // The number of pixels in the glyph (including unused pixels) in the Y axis.
+#define FONT_CHAR_ASCII_START        33
+#define FONT_CHAR_ASCII_END         126
 
-//
-// GfxInit
-// Initializes the Gfx component, such as
-// color arithmetic tables.
-//
-bool GfxInit(Uint32 pScreenW, Uint32 pScreenH, bool pFullscreen, Uint32 SDL_INIT_FLAGS)
+static uint8_t FONT_ATLAS[] = { // The font bits as 1 bit per pixel.
+	0xff, 0xfb, 0xfb, 0xfb, 0xff, 0xfb, 0xff, 0xff, 0xff, 0xeb, 0xeb, 0xff,
+	0xff, 0xff, 0xff, 0xff, 0xff, 0xeb, 0xc1, 0xeb, 0xc1, 0xeb, 0xff, 0xff,
+	0xff, 0xc3, 0xe9, 0xc1, 0xcb, 0xe1, 0xff, 0xff, 0xff, 0xdd, 0xef, 0xf7,
+	0xfb, 0xdd, 0xff, 0xff, 0xff, 0xf1, 0xfb, 0xd5, 0xed, 0xd3, 0xff, 0xff,
+	0xff, 0xfb, 0xfb, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xf7, 0xfb, 0xfb,
+	0xfb, 0xf7, 0xff, 0xff, 0xff, 0xfb, 0xf7, 0xf7, 0xf7, 0xfb, 0xff, 0xff,
+	0xff, 0xff, 0xeb, 0xf7, 0xeb, 0xff, 0xff, 0xff, 0xff, 0xff, 0xf7, 0xe3,
+	0xf7, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xfb, 0xfd, 0xff,
+	0xff, 0xff, 0xff, 0xe3, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff,
+	0xff, 0xfb, 0xff, 0xff, 0xff, 0xdf, 0xef, 0xf7, 0xfb, 0xfd, 0xff, 0xff,
+	0xff, 0xe3, 0xdd, 0xd5, 0xdd, 0xe3, 0xff, 0xff, 0xff, 0xf7, 0xf3, 0xf7,
+	0xf7, 0xe3, 0xff, 0xff, 0xff, 0xe1, 0xdf, 0xe3, 0xfd, 0xc1, 0xff, 0xff,
+	0xff, 0xe1, 0xdf, 0xe3, 0xdf, 0xe1, 0xff, 0xff, 0xff, 0xdd, 0xdd, 0xc1,
+	0xdf, 0xdf, 0xff, 0xff, 0xff, 0xc1, 0xfd, 0xe1, 0xdf, 0xe1, 0xff, 0xff,
+	0xff, 0xe3, 0xfd, 0xe1, 0xdd, 0xe3, 0xff, 0xff, 0xff, 0xc1, 0xdf, 0xcf,
+	0xdf, 0xdf, 0xff, 0xff, 0xff, 0xe3, 0xdd, 0xe3, 0xdd, 0xe3, 0xff, 0xff,
+	0xff, 0xc3, 0xdd, 0xc3, 0xdf, 0xdf, 0xff, 0xff, 0xff, 0xff, 0xfb, 0xff,
+	0xfb, 0xff, 0xff, 0xff, 0xff, 0xff, 0xfb, 0xff, 0xfb, 0xfd, 0xff, 0xff,
+	0xff, 0xf7, 0xfb, 0xfd, 0xfb, 0xf7, 0xff, 0xff, 0xff, 0xff, 0xe3, 0xff,
+	0xe3, 0xff, 0xff, 0xff, 0xff, 0xfd, 0xfb, 0xf7, 0xfb, 0xfd, 0xff, 0xff,
+	0xff, 0xe1, 0xdf, 0xe1, 0xff, 0xfd, 0xff, 0xff, 0xff, 0xe3, 0xcd, 0xd5,
+	0xcd, 0xfb, 0xff, 0xff, 0xff, 0xf7, 0xeb, 0xdd, 0xc1, 0xdd, 0xff, 0xff,
+	0xff, 0xf1, 0xed, 0xe1, 0xdd, 0xe1, 0xff, 0xff, 0xff, 0xc3, 0xfd, 0xfd,
+	0xfd, 0xc3, 0xff, 0xff, 0xff, 0xe1, 0xdd, 0xdd, 0xdd, 0xe1, 0xff, 0xff,
+	0xff, 0xc1, 0xfd, 0xe1, 0xfd, 0xc1, 0xff, 0xff, 0xff, 0xc1, 0xfd, 0xe1,
+	0xfd, 0xfd, 0xff, 0xff, 0xff, 0xc3, 0xfd, 0xcd, 0xdd, 0xc3, 0xff, 0xff,
+	0xff, 0xdd, 0xdd, 0xc1, 0xdd, 0xdd, 0xff, 0xff, 0xff, 0xe3, 0xf7, 0xf7,
+	0xf7, 0xe3, 0xff, 0xff, 0xff, 0xc1, 0xdf, 0xdf, 0xdd, 0xe3, 0xff, 0xff,
+	0xff, 0xdd, 0xdd, 0xe1, 0xdd, 0xdd, 0xff, 0xff, 0xff, 0xfd, 0xfd, 0xfd,
+	0xfd, 0xc1, 0xff, 0xff, 0xff, 0xc9, 0xd5, 0xdd, 0xdd, 0xdd, 0xff, 0xff,
+	0xff, 0xdd, 0xd9, 0xd5, 0xcd, 0xdd, 0xff, 0xff, 0xff, 0xe3, 0xdd, 0xdd,
+	0xdd, 0xe3, 0xff, 0xff, 0xff, 0xe1, 0xdd, 0xe1, 0xfd, 0xfd, 0xff, 0xff,
+	0xff, 0xe3, 0xdd, 0xdd, 0xcd, 0xc3, 0xff, 0xff, 0xff, 0xe1, 0xdd, 0xc1,
+	0xed, 0xdd, 0xff, 0xff, 0xff, 0xc3, 0xfd, 0xe3, 0xdf, 0xe1, 0xff, 0xff,
+	0xff, 0xc1, 0xf7, 0xf7, 0xf7, 0xf7, 0xff, 0xff, 0xff, 0xdd, 0xdd, 0xdd,
+	0xdd, 0xe3, 0xff, 0xff, 0xff, 0xdd, 0xdd, 0xdd, 0xeb, 0xf7, 0xff, 0xff,
+	0xff, 0xdd, 0xdd, 0xdd, 0xd5, 0xc9, 0xff, 0xff, 0xff, 0xdd, 0xdd, 0xe3,
+	0xdd, 0xdd, 0xff, 0xff, 0xff, 0xdd, 0xdd, 0xeb, 0xf7, 0xf7, 0xff, 0xff,
+	0xff, 0xc1, 0xdf, 0xe3, 0xfd, 0xc1, 0xff, 0xff, 0xff, 0xf3, 0xfb, 0xfb,
+	0xfb, 0xf3, 0xff, 0xff, 0xff, 0xfd, 0xfb, 0xf7, 0xef, 0xdf, 0xff, 0xff,
+	0xff, 0xf3, 0xf7, 0xf7, 0xf7, 0xf3, 0xff, 0xff, 0xff, 0xf7, 0xeb, 0xff,
+	0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xc1, 0xff, 0xff,
+	0xff, 0xfb, 0xf7, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xc3, 0xdd,
+	0xdd, 0xc3, 0xff, 0xff, 0xff, 0xfd, 0xfd, 0xe1, 0xdd, 0xe1, 0xff, 0xff,
+	0xff, 0xff, 0xc3, 0xfd, 0xfd, 0xc3, 0xff, 0xff, 0xff, 0xdf, 0xdf, 0xc3,
+	0xdd, 0xc3, 0xff, 0xff, 0xff, 0xff, 0xe3, 0xc1, 0xfd, 0xc3, 0xff, 0xff,
+	0xff, 0xe7, 0xfb, 0xf3, 0xfb, 0xfb, 0xff, 0xff, 0xff, 0xff, 0xc3, 0xdd,
+	0xc3, 0xdf, 0xe3, 0xff, 0xff, 0xfd, 0xfd, 0xe1, 0xdd, 0xdd, 0xff, 0xff,
+	0xff, 0xf7, 0xff, 0xf3, 0xf7, 0xe3, 0xff, 0xff, 0xff, 0xdf, 0xff, 0xdf,
+	0xdf, 0xdd, 0xe3, 0xff, 0xff, 0xfd, 0xdd, 0xe1, 0xdd, 0xdd, 0xff, 0xff,
+	0xff, 0xfb, 0xfb, 0xfb, 0xfb, 0xe7, 0xff, 0xff, 0xff, 0xff, 0xe1, 0xd5,
+	0xdd, 0xdd, 0xff, 0xff, 0xff, 0xff, 0xe1, 0xdd, 0xdd, 0xdd, 0xff, 0xff,
+	0xff, 0xff, 0xe3, 0xdd, 0xdd, 0xe3, 0xff, 0xff, 0xff, 0xff, 0xe1, 0xdd,
+	0xe1, 0xfd, 0xfd, 0xff, 0xff, 0xff, 0xc3, 0xdd, 0xc3, 0xdf, 0xdf, 0xff,
+	0xff, 0xff, 0xc5, 0xf9, 0xfd, 0xfd, 0xff, 0xff, 0xff, 0xff, 0xc3, 0xf9,
+	0xc7, 0xe1, 0xff, 0xff, 0xff, 0xfb, 0xf3, 0xfb, 0xfb, 0xe7, 0xff, 0xff,
+	0xff, 0xff, 0xdd, 0xdd, 0xdd, 0xe3, 0xff, 0xff, 0xff, 0xff, 0xdd, 0xdd,
+	0xeb, 0xf7, 0xff, 0xff, 0xff, 0xff, 0xdd, 0xdd, 0xd5, 0xeb, 0xff, 0xff,
+	0xff, 0xff, 0xdd, 0xe3, 0xdd, 0xdd, 0xff, 0xff, 0xff, 0xff, 0xdd, 0xdd,
+	0xc3, 0xdf, 0xe3, 0xff, 0xff, 0xff, 0xc1, 0xef, 0xf3, 0xc1, 0xff, 0xff,
+	0xff, 0xe7, 0xf7, 0xfb, 0xf7, 0xe7, 0xff, 0xff, 0xff, 0xfb, 0xfb, 0xfb,
+	0xfb, 0xfb, 0xff, 0xff, 0xff, 0xf3, 0xf7, 0xef, 0xf7, 0xf3, 0xff, 0xff,
+	0xff, 0xeb, 0xf5, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xc1, 0xc1, 0xc1,
+	0xc1, 0xc1, 0xff, 0xff
+};
+#include <iostream>
+int32_t cc0::gfx::index_linear(const cc0::gfx::Image &src, cc0::gfx::Point p)
 {
-	if (SDL_Init(SDL_INIT_FLAGS) == -1) {
-		return false;
+	if (p.x < 0 || p.y < 0 || p.x >= src.width || p.y >= src.height) {
+		std::cout << p.x << ", " << p.y << std::endl;
 	}
-	
-	if (sizeof(Sint32) == sizeof(Color32) && sizeof(Color32) == 4) {
-		// initializes addition table
-		for (Sint32 i = 0; i <= UCHAR_MAX; ++i){
-			Sint32 j = 0;
-			for (Sint32 n = i; n <= UCHAR_MAX; ++j, ++n){
-				tableAdd[i][j] = (Uint8)n;
-			}
-			for (; j <= UCHAR_MAX; ++j){
-				tableAdd[i][j] = UCHAR_MAX;
-			}
-		}
-
-		// initializes subtration table
-		for (Sint32 i = 0; i <= UCHAR_MAX; ++i){
-			Sint32 j = 0;
-			for (Sint32 n = i; n >= 0; ++j, --n){
-				tableSub[i][j] = (Uint8)n;
-			}
-			for (; j <= UCHAR_MAX; ++j){
-				tableSub[i][j] = 0;
-			}
-		}
-		
-		// initializes multiplication table
-		const float fBYTE_MAX = (float)UCHAR_MAX;
-		for (float i = 0; i <= fBYTE_MAX; ++i){
-			for (float j = 0; j <= fBYTE_MAX; ++j){
-				tableMul[(Sint32)i][(Sint32)j] = (Uint8)(i *(j/fBYTE_MAX));
-			}
-		}
-		
-		// initializes Uint8 to float table
-		for (Sint32 i = 0; i < UCHAR_MAX+1; ++i){
-			u8chan_to_fchan[i] = fBYTE_MAX/(float)i;
-		}
-	} else {
-		SDL_SetError("Gfx cannot be used (platform error)");
-		return false;
-	}
-	return GfxSetVideo(pScreenW, pScreenH, pFullscreen);
+	return (src.width * p.y) + p.x;
 }
 
-//
-// GfxQuit
-// Destroys the screen surface and calls SDL_Quit in the
-// correct order to prevent crash.
-//
-void GfxQuit( void )
+int32_t cc0::gfx::index_repeat_linear(const cc0::gfx::Image &src, cc0::gfx::Point p)
 {
-	SDL_FreeSurface(SDL_GetVideoSurface());
-	SDL_Quit();
+	return index_linear(src, Point{ p.x % src.width, p.y % src.height });
 }
 
-//
-// Color32
-//
-
-//
-// Color32 (ctor)
-//
-Color32::Color32( void ) : value(0) {}
-Color32::Color32(const Color32 &pColor) : value(pColor.value) {}
-Color32::Color32(const Color32 &pColor, Uint8 pAlpha) : value(pColor.value) { channels.alpha = pAlpha; }
-Color32::Color32(Uint32 pColor) : value(pColor) {}
-Color32::Color32(Uint8 pR, Uint8 pG, Uint8 pB, Uint8 pA)
+int32_t cc0::gfx::index_z(const cc0::gfx::Image&, cc0::gfx::Point p)
 {
-	channels.red = pR;
-	channels.green = pG;
-	channels.blue = pB;
-	channels.alpha = pA;
+	p.x = (p.x | (p.x << 8)) & 0x00FF00FF;
+	p.x = (p.x | (p.x << 4)) & 0x0F0F0F0F;
+	p.x = (p.x | (p.x << 2)) & 0x33333333;
+	p.x = (p.x | (p.x << 1)) & 0x55555555;
+
+	p.y = (p.y | (p.y << 8)) & 0x00FF00FF;
+	p.y = (p.y | (p.y << 4)) & 0x0F0F0F0F;
+	p.y = (p.y | (p.y << 2)) & 0x33333333;
+	p.y = (p.y | (p.y << 1)) & 0x55555555;
+
+	return p.x | (p.y << 1);
 }
 
-//
-// Color arithmetic operators
-//
-Color32 &operator +=(Color32 &pLeft, const Color32 &pRight)
+int32_t cc0::gfx::index_repeat_z(const cc0::gfx::Image &src, cc0::gfx::Point p)
 {
-	pLeft.channels.red = tableAdd[pLeft.channels.red][pRight.channels.red];
-	pLeft.channels.green = tableAdd[pLeft.channels.green][pRight.channels.green];
-	pLeft.channels.blue = tableAdd[pLeft.channels.blue][pRight.channels.blue];
-	pLeft.channels.alpha = tableAdd[pLeft.channels.alpha][pRight.channels.alpha];
-	return pLeft;
+	return index_z(src, Point{ p.x % src.width, p.y % src.height });
 }
-Color32 &operator -=(Color32 &pLeft, const Color32 &pRight)
+
+cc0::gfx::RGBA32 cc0::gfx::decode_RGBA16(const void *pixel)
 {
-	pLeft.channels.red = tableSub[pLeft.channels.red][pRight.channels.red];
-	pLeft.channels.green = tableSub[pLeft.channels.green][pRight.channels.green];
-	pLeft.channels.blue = tableSub[pLeft.channels.blue][pRight.channels.blue];
-	pLeft.channels.alpha = tableSub[pLeft.channels.alpha][pRight.channels.alpha];
-	return pLeft;
-}
-Color32 &operator *=(Color32 &pLeft, const Color32 &pRight)
-{
-	pLeft.channels.red = tableMul[pLeft.channels.red][pRight.channels.red];
-	pLeft.channels.green = tableMul[pLeft.channels.green][pRight.channels.green];
-	pLeft.channels.blue = tableMul[pLeft.channels.blue][pRight.channels.blue];
-	pLeft.channels.alpha = tableMul[pLeft.channels.alpha][pRight.channels.alpha];
-	return pLeft;
-}
-Color32 &operator >>=(Color32 &pLeft, Sint32 pRight)
-{
-	pLeft.channels.red >>= pRight;
-	pLeft.channels.green >>= pRight;
-	pLeft.channels.blue >>= pRight;
-	pLeft.channels.alpha >>= pRight;
-	return pLeft;
-}
-Color32 &operator <<=(Color32 &pLeft, Sint32 pRight)
-{
-	pLeft.channels.red <<= pRight;
-	pLeft.channels.green <<= pRight;
-	pLeft.channels.blue <<= pRight;
-	pLeft.channels.alpha <<= pRight;
-	return pLeft;
-}
-bool operator ==(Color32 pLeft, Color32 pRight) // does not test alpha
-{
-	return (
-		pLeft.channels.red == pRight.channels.red &&
-		pLeft.channels.green == pRight.channels.green &&
-		pLeft.channels.blue == pRight.channels.blue
-		);
-}
-bool operator !=(const Color32 &pLeft, const Color32 &pRight)
-{
-	return !(pLeft == pRight);
-}
-Color32 operator+(Color32 pLeft, const Color32 &pRight) { return (pLeft += pRight); }
-Color32 operator-(Color32 pLeft, const Color32 &pRight) { return (pLeft -= pRight); }
-Color32 operator*(Color32 pLeft, const Color32 &pRight) { return (pLeft *= pRight); }
-Color32 operator>>(Color32 pLeft, Sint32 pRight) { return (pLeft >>= pRight); }
-Color32 operator<<(Color32 pLeft, Sint32 pRight) { return (pLeft <<= pRight); }
-
-//
-// Nearest
-//
-
-//
-// operator()
-// Samples the nearest color. Looks pixelated
-// when stretched out, and looks aliased when
-// compressed to a smaller size than normal.
-//
-Color32 Nearest::operator()(const Image &pImage, float pU, float pV) const {
-	return pImage[(Sint32)((pImage.GetHeight()-1)*pV)][(Sint32)((pImage.GetWidth()-1)*pU)];
-}
-
-//
-// Bilinear
-//
-
-//
-// operator()
-// Samples the four closest colors and
-// interpolates between the colors to get the
-// most accurate color.
-//
-Color32 Bilinear::operator()(const Image &pImage, float pU, float pV) const {	
-	float fU = pU * (pImage.GetWidth() - 2);
-	float fV = pV * (pImage.GetHeight() - 2);
-	Sint32 iU = (Sint32)fU;
-	Sint32 iV = (Sint32)fV;
-	
-	float u_ratio = fU - iU;
-	float v_ratio = fV - iV;
-	float u_opposite = 1.f - u_ratio;
-	float v_opposite = 1.f - v_ratio;
-	
-	Color32 c00 = pImage[iV][iU];
-	Color32 c01 = pImage[iV+1][iU];
-	Color32 c10 = pImage[iV][iU+1];
-	Color32 c11 = pImage[iV+1][iU+1];
-	
-	Color32 final(
-		(Uint8)((c00.channels.red * u_opposite + c10.channels.red * u_ratio) * v_opposite + (c01.channels.red * u_opposite + c11.channels.red * u_ratio) * v_ratio),
-		(Uint8)((c00.channels.green * u_opposite + c10.channels.green * u_ratio) * v_opposite + (c01.channels.green * u_opposite + c11.channels.green * u_ratio) * v_ratio),
-		(Uint8)((c00.channels.blue * u_opposite + c10.channels.blue * u_ratio) * v_opposite + (c01.channels.blue * u_opposite + c11.channels.blue * u_ratio) * v_ratio),
-		(Uint8)((c00.channels.alpha * u_opposite + c10.channels.alpha * u_ratio) * v_opposite + (c01.channels.alpha * u_opposite + c11.channels.alpha * u_ratio) * v_ratio)
-	);
-	
-	return final;
-}
-
-//
-// Image
-//
-
-//
-// Free
-// Frees the data allocated for the image.
-//
-void Image::Free( void )
-{
-	delete [] pixels;
-	pixels = (Color32*)0;
-	width = 0;
-	height = 0;
-}
-
-//
-// Create
-// Allocated data for the image.
-//
-bool Image::Create(Sint32 pWidth, Sint32 pHeight)
-{
-	Free();
-	if (pWidth > 0 && pWidth <= Image::MaxDimension && pHeight > 0 && pHeight <= Image::MaxDimension) {
-		try {
-			pixels = new Color32 [pWidth*pHeight];
-			width = pWidth;
-			height = pHeight;
-		} catch (std::exception &pEx) {
-			std::ostringstream sout;
-			sout << "0x" << this << ": " << pEx.what();
-			SDL_SetError(sout.str().c_str());
-			Free();
-		}
-	} else {
-		std::ostringstream sout;
-		sout << "0x" << this << ": Invalid size";
-		SDL_SetError(sout.str().c_str());
-	}
-	return IsGood();
-}
-
-//
-// SetMemory
-// Force a specific memory in image.
-// Note: Does not free previous memory and can result
-// in memory leakage when used improperly.
-//
-void Image::SetMemory(Color32 *pPix, Sint32 pWidth, Sint32 pHeight)
-{
-	pixels = pPix;
-	width = pWidth;
-	height = pHeight;
-}
-
-//
-// Copy
-// Copies the data from an existing image.
-//
-bool Image::Copy(const Image &pImage)
-{
-	if (Create(pImage.width, pImage.height)) {
-		Color32 *dst = (*this)[0];
-		const Color32 *src = pImage[0];
-		for (Sint32 i=0; i < width*height; ++i){
-			dst[i] = src[i];
-		}
-		return true;
-	}
-	return false;
-}
-
-//
-// Load
-// Allocates data for image and loads a native format
-// from a file.
-//
-bool Image::Load(const std::string &pFile)
-{
-	std::ifstream fin(pFile.c_str(), std::ios::binary);
-	if (!fin.is_open()) {
-		std::ostringstream sout;
-		sout << "0x" << this << ": Could not open file";
-		SDL_SetError(sout.str().c_str());
-		return false;
-	}
-
-	try {
-		Sint32 typeSize=0;
-		fin.read((char*)(&typeSize), sizeof(typeSize));
-		if (typeSize == sizeof(Color32)) {
-			fin.read((char*)(&width), sizeof(width));
-			fin.read((char*)(&height), sizeof(height));
-			if (Create(width, height)) {
-				fin.read((char*)pixels, width*height*sizeof(Color32));
-			}
-		} else {
-			std::ostringstream sout;
-			sout << "0x" << this << ": Format not recognized";
-			SDL_SetError(sout.str().c_str());
-			Free();
-		}
-	} catch (std::exception &pEx) {
-		std::ostringstream sout;
-		sout << "0x" << this << ": " << pEx.what();
-		SDL_SetError(sout.str().c_str());
-		Free();
-	}
-
-	fin.close();
-	return IsGood();
-}
-
-//
-// Save
-// Saves the current image to a file in a native format.
-//
-bool Image::Save(const std::string &pFile) const
-{
-	if (width*height == 0 || pixels == NULL) { return false; }
-	std::ofstream fout(pFile.c_str(), std::ios::binary);
-	if (!fout.is_open()) {
-		std::ostringstream sout;
-		sout << "0x" << this << ": Could not open file";
-		SDL_SetError(sout.str().c_str());
-		return false;
-	}
-
-	try {
-		Sint32 typeSize = sizeof(Color32);
-		fout.write((char*)(&typeSize), sizeof(typeSize));
-		fout.write((char*)(&width), sizeof(width));
-		fout.write((char*)(&height), sizeof(height));
-		fout.write((char*)pixels, width*height*sizeof(Color32));
-	} catch (std::exception &pEx) {
-		std::ostringstream sout;
-		sout << "0x" << this << ": " << pEx.what();
-		SDL_SetError(sout.str().c_str());
-		fout.close();
-		return false;
-	}
-
-	fout.close();
-	return true;
-}
-
-//
-// Convert
-// Converts a non-native format to a native format.
-// Non-native formats are all formats loadable by
-// SDL and SDL_Image.
-// NOTE: If you are using SDL_image, include SDL_image.h
-// BEFORE gfx.h in your main.cpp/main.c.
-//
-bool Image::Convert(const std::string &pFile)
-{
-	Free();
-	
-	SDL_Surface *src = APIIMGLOAD(pFile.c_str());
-	if (src == (SDL_Surface*)0) { return false; } // No need to set SDL error manually
-
-	if (Create(src->w, src->h)) {
-		const Sint32 SIZE = width*height;
-		Color32 *dst = pixels;
-		for (int y = 0; y < height; ++y) {
-			for (int x = 0; x < width; ++x) {
-				Uint8 *spix = (Uint8 *)src->pixels + y * src->pitch + x * src->format->BytesPerPixel;
-				SDL_GetRGBA(
-					*((Uint32*)spix),
-					src->format,
-					&dst->channels.red,
-					&dst->channels.green,
-					&dst->channels.blue,
-					&dst->channels.alpha
-				);
-				++dst;
-			}
-		}
-	}
-
-	SDL_FreeSurface(src);
-
-	return IsGood();
-}
-
-//
-// ReverseByteorder
-// Reverses the byteorder in case Convert does not
-// accurately read the requested file.
-//
-void Image::ReverseByteorder( void )
-{
-	for (Sint32 i = 0; i < width*height; ++i){
-		Uint8 *bytes = (Uint8*)&pixels[i];
-		Uint8 temp = bytes[0];
-		bytes[0] = bytes[3];
-		bytes[3] = temp;
-		temp = bytes[1];
-		bytes[1] = bytes[2];
-		bytes[2] = temp;
-	}
-}
-
-//
-// GetRGB
-// Returns floating point channels of specified
-// pixel coordinate
-//
-void Image::GetRGB(Sint32 pX, Sint32 pY, float &pR, float &pG, float &pB) const
-{
-	pR = u8chan_to_fchan[(*this)[pY][pX].channels.red];
-	pG = u8chan_to_fchan[(*this)[pY][pX].channels.green];
-	pB = u8chan_to_fchan[(*this)[pY][pX].channels.blue];
-}
-
-//
-// GetRGBA
-// Returns floating point channels of specified
-// pixel coordinate
-//
-void Image::GetRGBA(Sint32 pX, Sint32 pY, float &pR, float &pG, float &pB, float &pA) const
-{
-	pR = u8chan_to_fchan[(*this)[pY][pX].channels.red];
-	pG = u8chan_to_fchan[(*this)[pY][pX].channels.green];
-	pB = u8chan_to_fchan[(*this)[pY][pX].channels.blue];
-	pA = u8chan_to_fchan[(*this)[pY][pX].channels.alpha];
-}
-
-//
-// SetRGB
-// Sets the specified pixel in accordance with
-// the given color channels
-//
-void Image::SetRGB(Sint32 pX, Sint32 pY, float pR, float pG, float pB)
-{
-	(*this)[pY][pX].channels.red = (Uint8)(pR*255.f);
-	(*this)[pY][pX].channels.green = (Uint8)(pG*255.f);
-	(*this)[pY][pX].channels.blue = (Uint8)(pB*255.f);
-}
-
-//
-// SetRGBA
-// Sets the specified pixel in accordance with
-// the given color channels
-//
-void Image::SetRGBA(Sint32 pX, Sint32 pY, float pR, float pG, float pB, float pA)
-{
-	(*this)[pY][pX].channels.red = (Uint8)(pR*255.f);
-	(*this)[pY][pX].channels.green = (Uint8)(pG*255.f);
-	(*this)[pY][pX].channels.blue = (Uint8)(pB*255.f);
-	(*this)[pY][pX].channels.alpha = (Uint8)(pA*255.f);
-}
-
-//
-// operator=
-//
-Image &Image::operator =(const Image &pImage)
-{
-	if (this != &pImage) {
-		Copy(pImage);
-	}
-	return *this;
-}
-
-//
-// Stream
-//
-
-//
-// Free
-// Frees file from file association.
-//
-void Image::Stream::Free( void )
-{
-	width = 0;
-	height = 0;
-	file.clear();
-	dataStart = 0;
-}
-
-//
-// Load
-// Associate to a file.
-//
-bool Image::Stream::Load(const std::string &pFile)
-{
-	std::ifstream fin(pFile.c_str(), std::ios::binary);
-	if (!fin.is_open()){
-		Free();
-		return false;
-	}
-
-	fin.read((char*)(&width), sizeof(width));
-	fin.read((char*)(&height), sizeof(height));
-	file = pFile;
-	dataStart = sizeof(width)+sizeof(height);
-
-	fin.close();
-	return true;
-}
-
-//
-// IsGood
-// Returns true if current file is a valid file.
-//
-bool Image::Stream::IsGood( void ) const
-{
-	std::ifstream fin(file.c_str(), std::ios::binary);
-	bool good = fin.is_open();
-	fin.close();
-	return good;
-}
-
-//
-// Refresh
-// If changes have been made to a file after it has been
-// loaded it could need refreshing.
-//
-bool Image::Stream::Refresh( void )
-{
-	return Load(file);
-}
-
-//
-// Screen
-//
-
-//
-// GfxSetVideo
-// Creates a screen surface for drawing. No direct screen
-// manipulation allowed (might solve instancing problems).
-//
-bool GfxSetVideo(Uint32 pScreenW, Uint32 pScreenH, bool pFullscreen)
-{
-	SDL_FreeSurface(SDL_GetVideoSurface());
-	if (pScreenW != 0 && pScreenW < 640 && pScreenH != 0 && pScreenH < 480 && pFullscreen){
-		std::ostringstream sout;
-		sout << "GfxScreen: Cannot allocate screen size of less than 640x480 in fullscreen mode";
-		SDL_SetError(sout.str().c_str());
-		return false;
-	}
-	if (((pScreenW == 0 && pScreenH == 0) || (pScreenW > 0 && pScreenH > 0)) &&
-		SDL_SetVideoMode(pScreenW, pScreenH, 32, SDL_SWSURFACE|SDL_DOUBLEBUF|(SDL_FULLSCREEN *Sint32(pFullscreen))) != (SDL_Surface*)0)
-	{
-		if (SDL_GetVideoSurface()->format->BytesPerPixel != sizeof(Color32)){
-			std::ostringstream sout;
-			sout << "GfxScreen: Cannot allocate pixel of byte size " << sizeof(Color32) << " (SDL limitation)";
-			SDL_SetError(sout.str().c_str());
-			SDL_FreeSurface(SDL_GetVideoSurface());
-			return false;
-		}
-	}
-	return true;
-}
-
-//
-// GfxFlip
-// Transfers the data from one image to
-// the screen.
-//
-bool GfxFlip(const Image &pSrc)
-{
-	class Screen : public Image
-	{
-	public:
-		Screen( void ) : Image() {
-			pixels = (Color32*)SDL_GetVideoSurface()->pixels;
-			width = SDL_GetVideoSurface()->w;
-			height = SDL_GetVideoSurface()->h;
-		}
-		~Screen( void ) {
-			pixels = (Color32*)0;
-		}
-	public:
-		void Lock( void ) {
-			if (SDL_MUSTLOCK(SDL_GetVideoSurface()) && SDL_GetVideoSurface()->locked == 0) {
-				SDL_LockSurface(SDL_GetVideoSurface());
-			}
-		}
-		void Unlock( void ) {
-			if (SDL_MUSTLOCK(SDL_GetVideoSurface())) {
-				while (SDL_GetVideoSurface()->locked > 0) {
-					SDL_UnlockSurface(SDL_GetVideoSurface());
-				}
-			}
-		}
-		void Release( void ) {
-			pixels = (Color32*)0;
-		}
+	// bits = RRRRR GGGGG BBBBB A
+	constexpr uint32_t FIX_SCALAR = (256 << 8) / 31;
+	const uint16_t     p16        = *((const uint16_t*)pixel);
+	const uint32_t     p32        = uint32_t(p16);
+	return RGBA32{
+		uint8_t(((p32 & 0x7800) * FIX_SCALAR) >> 19),
+		uint8_t(((p32 & 0x07C0) * FIX_SCALAR) >> 14),
+		uint8_t(((p32 & 0x003E) * FIX_SCALAR) >> 9),
+		uint8_t((p32 & 0x0001) ? 255 : 0)
 	};
+}
 
-	Screen screen;
-	screen.Lock();
+cc0::gfx::RGBA32 cc0::gfx::decode_RGB24(const void *pixel)
+{
+	return RGBA32{
+		((uint8_t*)pixel)[0],
+		((uint8_t*)pixel)[1],
+		((uint8_t*)pixel)[2],
+		255
+	};
+}
 
-	if (pSrc.GetWidth() == screen.GetWidth() && pSrc.GetHeight() == screen.GetHeight()){
-		const Color32 *src = pSrc[0];
-		Color32 *dst = screen[0];
-		const Sint32 size = pSrc.GetWidth()*pSrc.GetHeight();
-		for (Sint32 i = 0; i < size; ++i){
-			dst[i] = src[i];
-		}
-	} else {
-		unsigned int xscale = pSrc.GetWidth()/screen.GetWidth();
-		float yscale = (float)pSrc.GetHeight()/(float)screen.GetHeight();
-		if (xscale == yscale && !(xscale & (xscale - 1))) {
-			unsigned int si = (unsigned int)(log(yscale)/log(2.f)); // 2^si = xscale, si*ln(2)=ln(32)
-			if (si < 23) { // if more shifts are needed than 22, then loss of information
-				Sint32 *aaR = new Sint32[screen.GetWidth()];
-				Sint32 *aaG = new Sint32[screen.GetWidth()];
-				Sint32 *aaB = new Sint32[screen.GetWidth()];
-				for (Sint32 x = 0; x < screen.GetWidth(); ++x) {
-					aaR[x] = 0;
-					aaG[x] = 0;
-					aaB[x] = 0;
-				}
-				
-				Color32 *dst = screen[0];
-				const Color32 *src = pSrc[0];
-				for (Sint32 y = 0; y < screen.GetHeight(); ++y) {
-					for (Sint32 y0 = 0; y0 < yscale; ++y0) {
-						for (Sint32 x0 = 0; x0 < pSrc.GetWidth(); ++x0) {
-							aaR[x0>>si] += src[x0].channels.red;
-							aaG[x0>>si] += src[x0].channels.green;
-							aaB[x0>>si] += src[x0].channels.blue;
-						}
-						src += pSrc.GetWidth();
-					}
-					for (Sint32 x = 0; x < screen.GetWidth(); ++x) {
-						dst[x].channels.red = (Uint8)(aaR[x] >> (si+1));
-						dst[x].channels.green = (Uint8)(aaG[x] >> (si+1));
-						dst[x].channels.blue = (Uint8)(aaB[x] >> (si+1));
-						aaR[x] = 0;
-						aaG[x] = 0;
-						aaB[x] = 0;
-					}
-					dst += screen.GetWidth();
-				}
-				delete [] aaR;
-				delete [] aaG;
-				delete [] aaB;
-			} else {
-				Image::Blit(screen, 0, 0, screen.GetWidth(), screen.GetHeight(), pSrc);
-			}
-		} else {
-			Image::Blit(screen, 0, 0, screen.GetWidth(), screen.GetHeight(), pSrc);
+cc0::gfx::RGBA32 cc0::gfx::decode_RGBA32(const void *pixel)
+{
+	return RGBA32{
+		((uint8_t*)pixel)[0],
+		((uint8_t*)pixel)[1],
+		((uint8_t*)pixel)[2],
+		((uint8_t*)pixel)[3],
+	};
+}
+
+cc0::gfx::RGBA32 cc0::gfx::decode_BGRA16(const void *pixel)
+{
+	// bits = BBBBB GGGGG RRRRR A
+	constexpr uint32_t FIX_SCALAR = (256 << 8) / 31;
+	const uint16_t     p16        = *((const uint16_t*)pixel);
+	const uint32_t     p32        = uint32_t(p16);
+	return RGBA32{
+		uint8_t(((p32 & 0x003E) * FIX_SCALAR) >> 9),
+		uint8_t(((p32 & 0x07C0) * FIX_SCALAR) >> 14),
+		uint8_t(((p32 & 0x7800) * FIX_SCALAR) >> 19),
+		uint8_t((p32 & 0x0001) ? 255 : 0)
+	};
+}
+
+cc0::gfx::RGBA32 cc0::gfx::decode_BGR24(const void *pixel)
+{
+	return RGBA32{
+		((uint8_t*)pixel)[2],
+		((uint8_t*)pixel)[1],
+		((uint8_t*)pixel)[0],
+		255
+	};
+}
+
+cc0::gfx::RGBA32 cc0::gfx::decode_BGRA32(const void *pixel)
+{
+	return RGBA32{
+		((uint8_t*)pixel)[2],
+		((uint8_t*)pixel)[1],
+		((uint8_t*)pixel)[0],
+		((uint8_t*)pixel)[3],
+	};
+}
+
+cc0::gfx::RGBA32 cc0::gfx::decode_ARGB16(const void *pixel)
+{
+	// bits = A RRRRR GGGGG BBBBB
+	constexpr uint32_t FIX_SCALAR = (256 << 8) / 31;
+	const uint16_t     p16        = *((const uint16_t*)pixel);
+	const uint32_t     p32        = uint32_t(p16);
+	return RGBA32{
+		uint8_t(((p32 & 0x7C00) * FIX_SCALAR) >> 18),
+		uint8_t(((p32 & 0x03E0) * FIX_SCALAR) >> 13),
+		uint8_t(((p32 & 0x001F) * FIX_SCALAR) >> 8),
+		uint8_t((p32 & 0x8000) ? 255 : 0)
+	};
+}
+
+cc0::gfx::RGBA32 cc0::gfx::decode_ARGB32(const void *pixel)
+{
+	return RGBA32{
+		((uint8_t*)pixel)[1],
+		((uint8_t*)pixel)[2],
+		((uint8_t*)pixel)[3],
+		((uint8_t*)pixel)[0],
+	};
+}
+
+cc0::gfx::RGBA32 cc0::gfx::decode_ABGR16(const void *pixel)
+{
+	// bits = A BBBBB GGGGG RRRRR
+	constexpr uint32_t FIX_SCALAR = (256 << 8) / 31;
+	const uint16_t     p16        = *((const uint16_t*)pixel);
+	const uint32_t     p32        = uint32_t(p16);
+	return RGBA32{
+		uint8_t(((p32 & 0x001F) * FIX_SCALAR) >> 8),
+		uint8_t(((p32 & 0x03E0) * FIX_SCALAR) >> 13),
+		uint8_t(((p32 & 0x7C00) * FIX_SCALAR) >> 18),
+		uint8_t((p32 & 0x8000) ? 255 : 0)
+	};
+}
+
+cc0::gfx::RGBA32 cc0::gfx::decode_ABGR32(const void *pixel)
+{
+	return RGBA32{
+		((uint8_t*)pixel)[3],
+		((uint8_t*)pixel)[2],
+		((uint8_t*)pixel)[1],
+		((uint8_t*)pixel)[0],
+	};
+}
+
+uint8_t cc0::gfx::decode_1bpp(uint8_t pixelx8, int32_t i)
+{
+	return (pixelx8 & (1 << i)) > 0 ? 255 : 0;
+}
+
+void cc0::gfx::encode_RGBA16(cc0::gfx::RGBA32 color, void *out)
+{
+	// bits =  RRRRR GGGGG BBBBB A
+	constexpr uint32_t FIX_SCALAR = (32 << 8) / 255;
+	const uint32_t     r          = (uint32_t(color.red)   * FIX_SCALAR) >> 8;
+	const uint32_t     g          = (uint32_t(color.green) * FIX_SCALAR) >> 8;
+	const uint32_t     b          = (uint32_t(color.blue)  * FIX_SCALAR) >> 8;
+	const uint32_t     a          = uint32_t(color.alpha > 0);
+	const uint16_t     pixel      = uint16_t(a) | uint16_t(r << 11) | uint16_t(g << 6) | uint16_t(b << 1);
+	*((uint16_t*)out) = pixel;
+}
+
+void cc0::gfx::encode_RGB24(cc0::gfx::RGBA32 color, void *out)
+{
+	((uint8_t*)out)[0] = color.red;
+	((uint8_t*)out)[1] = color.green;
+	((uint8_t*)out)[2] = color.blue;
+}
+
+void cc0::gfx::encode_RGBA32(cc0::gfx::RGBA32 color, void *out)
+{
+	((uint8_t*)out)[0] = color.red;
+	((uint8_t*)out)[1] = color.green;
+	((uint8_t*)out)[2] = color.blue;
+	((uint8_t*)out)[3] = color.alpha;
+}
+
+void cc0::gfx::encode_BGRA16(cc0::gfx::RGBA32 color, void *out)
+{
+	// bits = BBBBB GGGGG RRRRR A
+	constexpr uint32_t FIX_SCALAR = (32 << 8) / 255;
+	const uint32_t     r          = (uint32_t(color.red)   * FIX_SCALAR) >> 8;
+	const uint32_t     g          = (uint32_t(color.green) * FIX_SCALAR) >> 8;
+	const uint32_t     b          = (uint32_t(color.blue)  * FIX_SCALAR) >> 8;
+	const uint32_t     a          = uint32_t(color.alpha > 0);
+	const uint16_t     pixel      = uint16_t(a) | uint16_t(b << 11) | uint16_t(g << 6) | uint16_t(r << 1);
+	*((uint16_t*)out) = pixel;
+}
+
+void cc0::gfx::encode_BGR24(cc0::gfx::RGBA32 color, void *out)
+{
+	((uint8_t*)out)[0] = color.blue;
+	((uint8_t*)out)[1] = color.green;
+	((uint8_t*)out)[2] = color.red;
+}
+
+void cc0::gfx::encode_BGRA32(cc0::gfx::RGBA32 color, void *out)
+{
+	((uint8_t*)out)[0] = color.blue;
+	((uint8_t*)out)[1] = color.green;
+	((uint8_t*)out)[2] = color.red;
+	((uint8_t*)out)[3] = color.alpha;
+}
+
+void cc0::gfx::encode_ARGB16(cc0::gfx::RGBA32 color, void *out)
+{
+	// bits = A RRRRR GGGGG BBBBB
+	constexpr uint32_t FIX_SCALAR = (32 << 8) / 255;
+	const uint32_t     r          = (uint32_t(color.red) * FIX_SCALAR) >> 8;
+	const uint32_t     g          = (uint32_t(color.green) * FIX_SCALAR) >> 8;
+	const uint32_t     b          = (uint32_t(color.blue) * FIX_SCALAR) >> 8;
+	const uint32_t     a          = uint32_t(color.alpha > 0) << 15;
+	const uint16_t     pixel      = uint16_t(a) | uint16_t(r << 10) | uint16_t(g << 5) | uint16_t(b);
+	*((uint16_t*)out) = pixel;
+}
+
+void cc0::gfx::encode_ARGB32(cc0::gfx::RGBA32 color, void *out)
+{
+	((uint8_t*)out)[0] = color.alpha;
+	((uint8_t*)out)[1] = color.red;
+	((uint8_t*)out)[2] = color.green;
+	((uint8_t*)out)[3] = color.blue;
+}
+
+void cc0::gfx::encode_ABGR16(cc0::gfx::RGBA32 color, void *out)
+{
+	// bits = A BBBBB GGGGG RRRRR
+	constexpr uint32_t FIX_SCALAR = (32 << 8) / 255;
+	const uint32_t     r          = (uint32_t(color.red) * FIX_SCALAR) >> 8;
+	const uint32_t     g          = (uint32_t(color.green) * FIX_SCALAR) >> 8;
+	const uint32_t     b          = (uint32_t(color.blue) * FIX_SCALAR) >> 8;
+	const uint32_t     a          = uint32_t(color.alpha > 0) << 15;
+	const uint16_t     pixel      = uint16_t(a) | uint16_t(b << 10) | uint16_t(g << 5) | uint16_t(r);
+	*((uint16_t*)out) = pixel;
+}
+
+void cc0::gfx::encode_ABGR32(cc0::gfx::RGBA32 color, void *out)
+{
+	((uint8_t*)out)[0] = color.alpha;
+	((uint8_t*)out)[1] = color.blue;
+	((uint8_t*)out)[2] = color.green;
+	((uint8_t*)out)[3] = color.red;
+}
+
+void cc0::gfx::encode_1bpp(uint8_t color, void *out, int32_t i)
+{
+	const uint8_t index = 1 << i;
+	const uint8_t mask = *(uint8_t*)out;
+	*(uint8_t*)out = (color > 0) ? (mask | index) : (mask & (~index));
+}
+
+cc0::gfx::RGBA32 cc0::gfx::decode_RGBA16(const cc0::gfx::Image &src, cc0::gfx::Point p)
+{
+	return decode_RGBA16(src.pixels + src.index(src, p) * 2);
+}
+
+cc0::gfx::RGBA32 cc0::gfx::decode_RGB24(const cc0::gfx::Image &src, cc0::gfx::Point p)
+{
+	return decode_RGB24(src.pixels + src.index(src, p) * 3);
+}
+
+cc0::gfx::RGBA32 cc0::gfx::decode_RGBA32(const cc0::gfx::Image &src, cc0::gfx::Point p)
+{
+	return decode_RGBA32(src.pixels + src.index(src, p) * 3);
+}
+
+cc0::gfx::RGBA32 cc0::gfx::decode_BGRA16(const cc0::gfx::Image &src, cc0::gfx::Point p)
+{
+	return decode_BGRA16(src.pixels + src.index(src, p) * 2);
+}
+
+cc0::gfx::RGBA32 cc0::gfx::decode_BGR24 (const cc0::gfx::Image &src, cc0::gfx::Point p)
+{
+	return decode_BGR24(src.pixels + src.index(src, p) * 3);
+}
+
+cc0::gfx::RGBA32 cc0::gfx::decode_BGRA32(const cc0::gfx::Image &src, cc0::gfx::Point p)
+{
+	return decode_BGRA32(src.pixels + src.index(src, p) * 4);
+}
+
+cc0::gfx::RGBA32 cc0::gfx::decode_ARGB16(const cc0::gfx::Image &src, cc0::gfx::Point p)
+{
+	return decode_ARGB16(src.pixels + src.index(src, p) * 2);
+}
+
+cc0::gfx::RGBA32 cc0::gfx::decode_ARGB32(const cc0::gfx::Image &src, cc0::gfx::Point p)
+{
+	return decode_ARGB32(src.pixels + src.index(src, p) * 4);
+}
+
+cc0::gfx::RGBA32 cc0::gfx::decode_ABGR16(const cc0::gfx::Image &src, cc0::gfx::Point p)
+{
+	return decode_ABGR16(src.pixels + src.index(src, p) * 2);
+}
+
+cc0::gfx::RGBA32 cc0::gfx::decode_ABGR32(const cc0::gfx::Image &src, cc0::gfx::Point p)
+{
+	return decode_ABGR32(src.pixels + src.index(src, p) * 4);
+}
+
+cc0::gfx::RGBA32 cc0::gfx::decode_1bpp(const cc0::gfx::Image &src, cc0::gfx::Point p)
+{
+	const uint32_t INDEX = src.index(src, p);
+	const uint8_t  MASK = decode_1bpp(((const uint8_t*)src.pixels)[INDEX >> 3], INDEX & 7);
+	return RGBA32{ MASK, MASK, MASK, MASK };
+}
+
+void cc0::gfx::encode_RGBA16(cc0::gfx::Image &dst, cc0::gfx::Point p, cc0::gfx::RGBA32 color)
+{
+	encode_RGBA16(color, dst.pixels + dst.index(dst, p) * 2);
+}
+
+void cc0::gfx::encode_RGB24(cc0::gfx::Image &dst, cc0::gfx::Point p, cc0::gfx::RGBA32 color)
+{
+	encode_RGB24(color, dst.pixels + dst.index(dst, p) * 3);
+}
+
+void cc0::gfx::encode_RGBA32(cc0::gfx::Image &dst, cc0::gfx::Point p, cc0::gfx::RGBA32 color)
+{
+	encode_RGBA32(color, dst.pixels + dst.index(dst, p) * 4);
+}
+
+void cc0::gfx::encode_BGRA16(cc0::gfx::Image &dst, cc0::gfx::Point p, cc0::gfx::RGBA32 color)
+{
+	encode_BGRA16(color, dst.pixels + dst.index(dst, p) * 2);
+}
+
+void cc0::gfx::encode_BGR24(cc0::gfx::Image &dst, cc0::gfx::Point p, cc0::gfx::RGBA32 color)
+{
+	encode_BGR24(color, dst.pixels + dst.index(dst, p) * 3);
+}
+
+void cc0::gfx::encode_BGRA32(cc0::gfx::Image &dst, cc0::gfx::Point p, cc0::gfx::RGBA32 color)
+{
+	encode_BGRA32(color, dst.pixels + dst.index(dst, p) * 4);
+}
+
+void cc0::gfx::encode_ARGB16(cc0::gfx::Image &dst, cc0::gfx::Point p, cc0::gfx::RGBA32 color)
+{
+	encode_ARGB16(color, dst.pixels + dst.index(dst, p) * 2);
+}
+
+void cc0::gfx::encode_ARGB32(cc0::gfx::Image &dst, cc0::gfx::Point p, cc0::gfx::RGBA32 color)
+{
+	encode_ARGB32(color, dst.pixels + dst.index(dst, p) * 4);
+}
+
+void cc0::gfx::encode_ABGR16(cc0::gfx::Image &dst, cc0::gfx::Point p, cc0::gfx::RGBA32 color)
+{
+	encode_ABGR16(color, dst.pixels + dst.index(dst, p) * 2);
+}
+
+void cc0::gfx::encode_ABGR32(cc0::gfx::Image &dst, cc0::gfx::Point p, cc0::gfx::RGBA32 color)
+{
+	encode_ABGR32(color, dst.pixels + dst.index(dst, p) * 4);
+}
+
+void cc0::gfx::encode_1bpp(cc0::gfx::Image &dst, cc0::gfx::Point p, cc0::gfx::RGBA32 color)
+{
+	const uint32_t INDEX = dst.index(dst, p);
+	encode_1bpp(color.alpha > 0, ((uint8_t*)dst.pixels) + (INDEX >> 3), INDEX & 7);
+}
+
+cc0::gfx::RGBA32 cc0::gfx::shade_set(cc0::gfx::RGBA32, cc0::gfx::RGBA32 src)
+{
+	return src;
+}
+
+cc0::gfx::RGBA32 cc0::gfx::shade_alpha(cc0::gfx::RGBA32 pDst, cc0::gfx::RGBA32 pSrc)
+{
+	pDst.red   += (pSrc.alpha * (pSrc.red   - pDst.red)   >> CHAR_BIT);
+	pDst.green += (pSrc.alpha * (pSrc.green - pDst.green) >> CHAR_BIT);
+	pDst.blue  += (pSrc.alpha * (pSrc.blue  - pDst.blue)  >> CHAR_BIT);
+	pDst.alpha += (pSrc.alpha * (pSrc.alpha - pDst.alpha) >> CHAR_BIT);
+	return pDst;
+}
+
+cc0::gfx::RGBA32 cc0::gfx::shade_colorkey(cc0::gfx::RGBA32 pDst, cc0::gfx::RGBA32 pSrc)
+{
+	static const RGBA32   COLORKEY  = cc0::gfx::RGBA32{ 255, 0, 255, 0 };
+	static const uint32_t KEY       = *(uint32_t*)(&COLORKEY);
+	static const RGBA32   ALPHAMASK = cc0::gfx::RGBA32{ 255, 255, 255, 0 };
+	static const uint32_t MASK      = *(uint32_t*)(&ALPHAMASK);
+	return (((*(uint32_t*)(&pSrc)) & MASK) == KEY) ? pDst : pSrc;
+}
+
+cc0::gfx::RGBA32 cc0::gfx::shade_gray(cc0::gfx::RGBA32, cc0::gfx::RGBA32 pSrc)
+{
+	const uint8_t GRAY = (uint8_t)(
+		(float)pSrc.red   * 0.30f +
+		(float)pSrc.green * 0.59f +
+		(float)pSrc.blue  * 0.11f
+	);
+	return RGBA32{ GRAY, GRAY, GRAY, pSrc.alpha };
+}
+
+cc0::gfx::RGBA32 cc0::gfx::shade_grayalpha(cc0::gfx::RGBA32 pDst, cc0::gfx::RGBA32 pSrc)
+{
+	return shade_alpha(pDst, shade_gray(pDst, pSrc));
+}
+
+cc0::gfx::RGBA32 cc0::gfx::shade_graycolorkey(cc0::gfx::RGBA32 pDst, cc0::gfx::RGBA32 pSrc)
+{
+	static const RGBA32   COLORKEY  = cc0::gfx::RGBA32{ 255, 0, 255, 0 };
+	static const uint32_t KEY       = *(uint32_t*)(&COLORKEY);
+	static const RGBA32   ALPHAMASK = cc0::gfx::RGBA32{ 255, 255, 255, 0 };
+	static const uint32_t MASK      = *(uint32_t*)(&ALPHAMASK);
+	return (((*(uint32_t*)(&pSrc)) & MASK) == KEY) ? pDst : shade_gray(pDst, pSrc);
+}
+
+cc0::gfx::RGBA32 cc0::gfx::shade_stencil(cc0::gfx::RGBA32 dst, cc0::gfx::RGBA32 src)
+{
+	return src.alpha > 0 ? src : dst;
+}
+
+cc0::gfx::RGBA32 cc0::gfx::sample_nearest(const cc0::gfx::Image &pImage, float pU, float pV)
+{
+	return get_color(pImage, Point{ (int32_t)((pImage.width - 1) * pU), (int32_t)((pImage.height - 1) * pV) });
+}
+
+cc0::gfx::RGBA32 cc0::gfx::sample_bilinear(const cc0::gfx::Image &pImage, float pU, float pV)
+{
+	const float   fU = pU * (pImage.width  - 2);
+	const float   fV = pV * (pImage.height - 2);
+	const int32_t iU = (int32_t)fU;
+	const int32_t iV = (int32_t)fV;
+	
+	const float u_ratio    = fU - iU;
+	const float v_ratio    = fV - iV;
+	const float u_opposite = 1.0f - u_ratio;
+	const float v_opposite = 1.0f - v_ratio;
+	
+	const RGBA32 c00 = get_color(pImage, Point{ iU,     iV });
+	const RGBA32 c01 = get_color(pImage, Point{ iU,     iV + 1 });
+	const RGBA32 c10 = get_color(pImage, Point{ iU + 1, iV });
+	const RGBA32 c11 = get_color(pImage, Point{ iU + 1, iV + 1 });
+	
+	return RGBA32{
+		(uint8_t)((c00.red   * u_opposite + c10.red   * u_ratio) * v_opposite + (c01.red   * u_opposite + c11.red   * u_ratio) * v_ratio),
+		(uint8_t)((c00.green * u_opposite + c10.green * u_ratio) * v_opposite + (c01.green * u_opposite + c11.green * u_ratio) * v_ratio),
+		(uint8_t)((c00.blue  * u_opposite + c10.blue  * u_ratio) * v_opposite + (c01.blue  * u_opposite + c11.blue  * u_ratio) * v_ratio),
+		(uint8_t)((c00.alpha * u_opposite + c10.alpha * u_ratio) * v_opposite + (c01.alpha * u_opposite + c11.alpha * u_ratio) * v_ratio)
+	};
+}
+
+template < typename type_t >
+type_t lerp(type_t a, type_t b, int32_t x)
+{
+	return a + (((b - a) * x) >> 15);
+}
+
+template < typename type_t >
+type_t bilerp(type_t p00, type_t p10, type_t p01, type_t p11, int32_t x, int32_t y)
+{
+	return lerp(lerp(p00, p01, y), lerp(p10, p11, y), x);
+}
+
+cc0::gfx::RGBA32 rgba_bilerp(cc0::gfx::RGBA32 p00, cc0::gfx::RGBA32 p10, cc0::gfx::RGBA32 p01, cc0::gfx::RGBA32 p11, int32_t x, int32_t y)
+{
+	return cc0::gfx::RGBA32{
+		(uint8_t)bilerp((int32_t)p00.red,   (int32_t)p10.red,   (int32_t)p01.red,   (int32_t)p11.red,   x, y),
+		(uint8_t)bilerp((int32_t)p00.green, (int32_t)p10.green, (int32_t)p01.green, (int32_t)p11.green, x, y),
+		(uint8_t)bilerp((int32_t)p00.blue,  (int32_t)p10.blue,  (int32_t)p01.blue,  (int32_t)p11.blue,  x, y),
+		(uint8_t)bilerp((int32_t)p00.alpha, (int32_t)p10.alpha, (int32_t)p01.alpha, (int32_t)p11.alpha, x, y)
+	}; 
+}
+
+cc0::gfx::RGBA32 cc0::gfx::sample_nearest(const cc0::gfx::Image &pImage, int32_t pU, int32_t pV)
+{
+	return get_color(pImage, Point{ pU >> 15, pV >> 15 });
+}
+
+cc0::gfx::RGBA32 cc0::gfx::sample_bilinear(const cc0::gfx::Image &pImage, int32_t pU, int32_t pV)
+{
+	const int32_t x = pU >> 15;
+	const int32_t y = pV >> 15;
+	const RGBA32 c00 = get_color(pImage, Point{ x,     y });
+	const RGBA32 c01 = get_color(pImage, Point{ x,     y + 1 });
+	const RGBA32 c10 = get_color(pImage, Point{ x + 1, y });
+	const RGBA32 c11 = get_color(pImage, Point{ x + 1, y + 1 });
+	return rgba_bilerp(c00, c10, c01, c11, pU & 0x7fff, pV & 0x7fff);
+}
+
+cc0::gfx::Image cc0::gfx::new_image(void *pixels, int32_t width, int32_t height, int32_t bytes_per_pixel, cc0::gfx::Encoder encoder, cc0::gfx::Decoder decoder, cc0::gfx::Indexer indexer)
+{
+	return Image{
+		(uint8_t*)pixels,
+		width, height,
+		encoder, decoder, indexer
+	};
+}
+
+cc0::gfx::RGBA32 cc0::gfx::get_color(const cc0::gfx::Image &src, cc0::gfx::Point p)
+{
+	return src.decode(src, p);
+}
+
+void cc0::gfx::set_color(cc0::gfx::Image &dst, cc0::gfx::Point p, cc0::gfx::RGBA32 c)
+{
+	dst.encode(dst, p, c);
+}
+
+void cc0::gfx::fill_rect(cc0::gfx::Image &dst, cc0::gfx::Rect dst_rect, cc0::gfx::RGBA32 color, cc0::gfx::Shader shader)
+{
+	dst_rect.a.x = 0          > dst_rect.a.x ? 0          : dst_rect.a.x;
+	dst_rect.a.y = 0          > dst_rect.a.y ? 0          : dst_rect.a.y;
+	dst_rect.b.x = dst.width  < dst_rect.b.x ? dst.width  : dst_rect.b.x;
+	dst_rect.b.y = dst.height < dst_rect.b.y ? dst.height : dst_rect.b.y;
+	
+	for (int32_t y = dst_rect.a.y; y < dst_rect.b.y; ++y) {
+		for (int32_t x = dst_rect.a.x; x < dst_rect.b.x; ++x) {
+			const Point p = { x, y };
+			set_color(dst, p, shader(get_color(dst, p), color));
 		}
 	}
-	
-	screen.Unlock();
-	screen.Release();
+}
 
-	return (SDL_Flip(SDL_GetVideoSurface()) != -1);
+void cc0::gfx::draw_line(cc0::gfx::Image &pDst, int32_t pX1, int32_t pY1, cc0::gfx::RGBA32 pColor1, int32_t pX2, int32_t pY2, cc0::gfx::RGBA32 pColor2, cc0::gfx::Shader shader)
+{
+	const float r1 = pColor1.red;
+	const float g1 = pColor1.green;
+	const float b1 = pColor1.blue;
+	const float a1 = pColor1.alpha;
+	const float r2 = pColor2.red;
+	const float g2 = pColor2.green;
+	const float b2 = pColor2.blue;
+	const float a2 = pColor2.alpha;
+	
+	const float xdiff = (float)(pX2 - pX1);
+	const float ydiff = (float)(pY2 - pY1);
+	
+	if (xdiff == 0.0f && ydiff == 0.0f) {
+		if (pX1 >= 0 && pX1 < pDst.width && pY1 >= 0 && pY1 < pDst.height) {
+			RGBA32 color = { (uint8_t)r1, (uint8_t)g1, (uint8_t)b1, (uint8_t)a1 };
+			set_color(pDst, Point{ pX1, pY1 }, shader(get_color(pDst, Point{ pX1, pY1 }), color));
+		}
+		return;
+	}
+	
+	if (fabs(xdiff) > fabs(ydiff)) {
+		float xmin, xmax;
+		
+		// set xmin to the lower x value given
+		// and xmax to the higher value
+		if (pX1 < pX2) {
+			xmin = (float)pX1;
+			xmax = (float)pX2;
+		} else {
+			xmin = (float)pX2;
+			xmax = (float)pX1;
+		}
+		xmin = xmin > 0.0f ? xmin : 0.0f; // clipping
+		xmax = xmax < (pDst.width - 1) ? xmax : (pDst.width - 1); // clipping
+		
+		// draw line in terms of y slope
+		const float slope = ydiff / xdiff;
+		for (float x = xmin; x <= xmax; x += 1.0f) {
+			const float y = pY1 + ((x - pX1) * slope);
+			if (y < 0.0f || y >= pDst.height) {
+				continue; // clipping
+			}
+			const RGBA32 color = {
+				(uint8_t)(r1 + ((r2 - r1) * ((x - pX1) / xdiff))),
+				(uint8_t)(g1 + ((g2 - g1) * ((x - pX1) / xdiff))),
+				(uint8_t)(b1 + ((b2 - b1) * ((x - pX1) / xdiff))),
+				(uint8_t)(a1 + ((a2 - a1) * ((x - pX1) / xdiff)))
+			};
+			const Point p = { (int32_t)x, (int32_t)y };
+			set_color(pDst, p, shader(get_color(pDst, p), color));
+		}
+	} else {
+		float ymin, ymax;
+		
+		// set ymin to the lower y value given
+		// and ymax to the higher value
+		if (pY1 < pY2) {
+			ymin = (float)pY1;
+			ymax = (float)pY2;
+		} else {
+			ymin = (float)pY2;
+			ymax = (float)pY1;
+		}
+		ymin = ymin > 0.0f              ? ymin : 0.0f;              // clipping
+		ymax = ymax < (pDst.height - 1) ? ymax : (pDst.height - 1); // clipping
+		
+		// draw line in terms of x slope
+		const float slope = xdiff / ydiff;
+		for (float y = ymin; y <= ymax; y += 1.0f) {
+			const float x = pX1 + ((y - pY1) * slope);
+			if (x < 0.0f || x >= pDst.width) {
+				continue; // clipping
+			}
+			const RGBA32 color = {
+				(uint8_t)(r1 + ((r2 - r1) * ((y - pY1) / ydiff))),
+				(uint8_t)(g1 + ((g2 - g1) * ((y - pY1) / ydiff))),
+				(uint8_t)(b1 + ((b2 - b1) * ((y - pY1) / ydiff))),
+				(uint8_t)(a1 + ((a2 - a1) * ((y - pY1) / ydiff)))
+			};
+			const Point p = { (int32_t)x, (int32_t)y };
+			set_color(pDst, p, shader(get_color(pDst, p), color));
+		}
+	}
+}
+
+template < typename type_t >
+void swap(type_t &a, type_t &b)
+{
+	type_t t = a;
+	a = b;
+	b = t;
+}
+
+template < typename type_t >
+type_t min(type_t a, type_t b)
+{
+	return a < b ? a : b;
+}
+
+template < typename type_t >
+type_t max(type_t a, type_t b)
+{
+	return a > b ? a : b;
+}
+
+template < typename type_t >
+type_t clamp(type_t min, type_t x, type_t max)
+{
+	return ::max(min, ::min(x, max));
+}
+
+cc0::gfx::Rect order(cc0::gfx::Rect r)
+{
+	if (r.a.x > r.b.x) { swap(r.a.x, r.b.x); }
+	if (r.a.y > r.b.y) { swap(r.a.y, r.b.x); }
+	return r;
+}
+
+void cc0::gfx::stretch_image(cc0::gfx::Image &dst, cc0::gfx::Rect dst_rect, const cc0::gfx::Image &src, cc0::gfx::Rect src_rect, cc0::gfx::Rect write_rect)
+{
+	write_rect = order(write_rect);
+	clamp(0, write_rect.a.x, dst.width);
+	clamp(0, write_rect.b.x, dst.width);
+	clamp(0, write_rect.a.y, dst.height);
+	clamp(0, write_rect.b.y, dst.height);
+
+	if (src_rect.a.x == src_rect.b.x) { return; }
+	if (src_rect.a.y == src_rect.b.y) { return; }
+	if (dst_rect.a.x == dst_rect.b.x) { return; }
+	if (dst_rect.a.y == dst_rect.b.y) { return; }
+
+	clamp(0, src_rect.a.x, src.width);
+	clamp(0, src_rect.b.x, src.width);
+	clamp(0, src_rect.a.y, src.height);
+	clamp(0, src_rect.b.y, src.height);
+
+	if (dst_rect.a.x > dst_rect.b.x) {
+		swap(dst_rect.a.x, dst_rect.b.x);
+		swap(src_rect.a.x, src_rect.b.x);
+	}
+	if (dst_rect.a.y > dst_rect.b.y) {
+		swap(dst_rect.a.y, dst_rect.b.y);
+		swap(src_rect.a.y, src_rect.b.y);
+	}
+
+	if (dst_rect.b.x < write_rect.a.x || dst_rect.a.x >= write_rect.b.x) { return; }
+	if (dst_rect.b.y < write_rect.a.x || dst_rect.a.y >= write_rect.b.y) { return; }
+
+	const int32_t dsx = ((src_rect.b.x - src_rect.a.x) << 15) / (dst_rect.b.x - dst_rect.a.x);
+	const int32_t dsy = ((src_rect.b.y - src_rect.a.y) << 15) / (dst_rect.b.y - dst_rect.a.y);
+
+	dst_rect.b.x = dst_rect.b.x < dst.width  ? dst_rect.b.x : dst.width;
+	dst_rect.b.y = dst_rect.b.y < dst.height ? dst_rect.b.y : dst.height;
+
+	int32_t ssx = min(src_rect.a.x, src_rect.b.x) << 15;
+	if (dst_rect.a.x < write_rect.a.x) {
+		ssx += dsx * (dst_rect.a.x - write_rect.a.x);
+		dst_rect.a.x = write_rect.a.x;
+	}
+
+	int32_t ssy = min(src_rect.a.y, src_rect.b.y) << 15;
+	if (dst_rect.a.y < write_rect.a.y) {
+		ssy += dsy * (dst_rect.a.y - write_rect.a.y);
+		dst_rect.a.y = write_rect.a.y;
+	}
+	const int32_t esx = max(src_rect.a.x, src_rect.b.x) << 15;
+	const int32_t esy = max(src_rect.a.y, src_rect.b.y) << 15;
+	for (int32_t dy = dst_rect.a.y, sy = 0; dy < dst_rect.b.y; ++dy, sy += abs(dsy)) {
+		for (int32_t dx = dst_rect.a.x, sx = 0; dx < dst_rect.b.x; ++dx, sx += abs(dsx)) {
+			set_color(
+				dst,
+				Point{ dx, dy },
+				get_color(
+					src,
+					Point{
+						(dsx >= 0 ? ssx + sx : esx - sx - abs(dsx)) >> 15,
+						(dsy >= 0 ? ssy + sy : esy - sy - abs(dsy)) >> 15
+					}
+				)
+			);
+		}
+	}
+}
+
+void cc0::gfx::draw_image(cc0::gfx::Image &pDst, int32_t pDx1, int32_t pDy1, int32_t pDx2, int32_t pDy2, const cc0::gfx::Image &pSrc, cc0::gfx::Shader shader, cc0::gfx::Sampler sampler, int32_t pSx1, int32_t pSy1, int32_t pSx2, int32_t pSy2)
+{
+	// clip pSrcRect against max borders
+	pSx1 = 0           > pSx1 ? 0           : pSx1;
+	pSy1 = 0           > pSy1 ? 0           : pSy1;
+	pSx2 = pSrc.width  < pSx2 ? pSrc.width  : pSx2;
+	pSy2 = pSrc.height < pSy2 ? pSrc.height : pSy2;
+	
+	float       u1 = (float)pSx1 / (float)(pSrc.width-1);
+	float       v1 = (float)pSy1 / (float)(pSrc.height-1);
+	float       u2 = (float)pSx2 / (float)(pSrc.width-1);
+	float       v2 = (float)pSy2 / (float)(pSrc.height-1);
+	const float du = (u2 - u1) / (float)(pDx2 - pDx1);
+	const float dv = (v2 - v1) / (float)(pDy2 - pDy1);
+	
+	// enable a negative writable area on pDst (flips blit direction)
+	if (pDx2 < pDx1) {
+		const int32_t itemp = pDx1;
+		pDx1 = pDx2;
+		pDx2 = itemp;
+		float ftemp = u1;
+		u1 = u2;
+		u2 = ftemp;
+		if (pDx1 < 0) { // make read offset for pSrc + clip against min borders
+			u1 = u1 - du * pDx1;
+			pDx1 = 0;
+		}
+	} else if (pDx1 < 0) { // make read offset for pSrc + clip against min borders
+		u1 = u1 + du * -pDx1;
+		pDx1 = 0;
+	}
+	if (pDy2 < pDy1) {
+		const int32_t itemp = pDy1;
+		pDy1 = pDy2;
+		pDy2 = itemp;
+		float ftemp = v1;
+		v1 = v2;
+		v2 = ftemp;
+		if (pDy1 < 0) { // make read offset for pSrc + clip against min borders
+			v1 = v1 - dv * pDy1;
+			pDy1 = 0;
+		}
+	} else if (pDy1 < 0) { // make read offset for pSrc + clip against min borders
+		v1 = v1 + dv * -pDy1;
+		pDy1 = 0;
+	}
+	
+	// clip pDstRect against max borders
+	pDx2 = pDst.width  < pDx2 ? pDst.width  : pDx2;
+	pDy2 = pDst.height < pDy2 ? pDst.height : pDy2;
+	
+	// determine writable area
+	const int32_t MAXY = pDy2 - pDy1;
+	const int32_t MAXX = pDx2 - pDx1;
+	if (MAXX < 0 || MAXY < 0) { return; } // readable area is negative (probably because pSrc is offscreen)
+	
+	const int32_t DST_WIDTH = pDst.width;
+	
+	// draw scanlines
+	float v = v1;
+	for (int32_t y = 0; y < MAXY; ++y) {
+		float u = u1;
+		for (int32_t x = 0; x < MAXX; ++x) {
+			const Point p = { x + pDx1, y + pDy1 };
+			set_color(pDst, p, shader(get_color(pDst, p), sampler(pSrc, u, v)));
+			u += du;
+		}
+		v += dv;
+	}
+}
+
+int32_t cc0::gfx::text(cc0::gfx::Image &dst, cc0::gfx::Point p, const char *text, int32_t text_len, cc0::gfx::RGBA32 color, int32_t scale)
+{
+	const Image src = new_image(
+		FONT_ATLAS,
+		FONT_ATLAS_CHAR_WIDTH_COUNT * FONT_CELL_PX_WIDTH, FONT_ATLAS_CHAR_HEIGHT_COUNT * FONT_CELL_PX_HEIGHT, 0,
+		encode_1bpp, decode_1bpp, index_linear
+	);
+	for (int32_t i = 0; i < text_len && text[i] != 0; ++i, p.x += FONT_CHAR_PX_WIDTH) {
+		if (text[i] != ' ') {
+			const int32_t sy = 0;
+			draw_image(
+				dst, p.x, p.y, p.x + FONT_CELL_PX_WIDTH, p.y + FONT_CELL_PX_HEIGHT,
+				src, shade_stencil, sample_nearest,
+				0, sy, FONT_CELL_PX_WIDTH, sy + FONT_CELL_PX_HEIGHT
+			);
+		}
+	}
+	return p.x;
 }

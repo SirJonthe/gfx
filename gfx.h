@@ -1,601 +1,496 @@
-//
-// gfx.h
-// Provides a simple interface for graphics using SDL.
-//
-// Copyright (c) Jonathan Karlsson 2010
-// Code may be used freely for commercial and non-commercial purposes.
-// Author retains his moral rights under the applicable copyright laws
-// (i.e. credit the author where credit is due).
-//
+#ifndef CC0_GFX_H_INCLUDED__
+#define CC0_GFX_H_INCLUDED__
 
-#ifndef GFX_H_INCLUDED__
-#define GFX_H_INCLUDED__
-
-#ifdef _MSC_VER
-#pragma comment(lib, "SDL.lib")
-#pragma comment(lib, "SDLmain.lib")
-#endif
-
-#include <string>
 #include <limits.h>
-#include <fstream>
 #include <math.h>
-#ifdef __GNUC__
-#include <SDL/SDL.h> // -lSDL -SDLmain (gcc/g++)
-#else
-#include "SDL.h" // SDL.lib SDLmain.lib (msvc)
-#endif
+#include <cstdint>
 
-//
-// defines
-// Determines what loader is the most approapriate.
-// IMG_Load should be used if possible, but should not
-// be a requirement for using this library. Not including
-// SDL_image means that only .BMP files can be loaded.
-//
-#ifdef _SDL_IMAGE_H
-#define APIIMGLOAD IMG_Load
-#else
-#define APIIMGLOAD SDL_LoadBMP
-#endif
-
-// really fast way to convert a [0-1] range float to 0-255 range uchar (note: makes permanent changes to input float)
-// NOTE: Too compiler-dependent to rely on.
-//#define fchan_to_u8chan(flt, uch) flt=flt*255.0f+256.0f; uch = ((*(int*)&flt)&0x7fffff)>>15;
-
-//
-// System functions
-// 
-bool GfxInit(Uint32 pScreenW=640, Uint32 pScreenH=480, bool pFullscreen=false, Uint32 SDL_INIT_FLAGS=SDL_INIT_VIDEO);
-void GfxQuit( void );
-
-//
-// ARGB32/BGRA32
-// 32-bit single channel color structures.
-//
-struct ARGB32 {
-	Uint8 alpha,red,green,blue;
-};
-struct BGRA32 {
-	Uint8 blue,green,red,alpha;
-};
-
-//
-// Color32
-// Providing saturation arithmetic for colors.
-//
-union Color32
+namespace cc0
 {
-public:
-	Uint32 value;
-	// NOT SURE ABOUT OSX!
-	// Maybe Intel machines still use backwards color channels for compatibility with PPC apps... (?)
-	// That would mean that I should not reverse color channels if big endinan on OSX.
-#ifdef __MACOSX__
-	#if SDL_BYTEORDER == SDL_LIL_ENDIAN
-		ARGB32 channels;
-	#else
-		BGRA32 channels;
-	#endif
-#elif defined __WIN32__
-	#if SDL_BYTEORDER == SDL_LIL_ENDIAN
-		BGRA32 channels;
-	#else
-		ARGB32 channels;
-	#endif
-#elif defined __LINUX__
-	#if SDL_BYTEORDER == SDL_LIL_ENDIAN
-		BGRA32 channels;
-	#else
-		ARGB32 channels;
-	#endif
-#endif
-public:
-	Color32( void );
-	Color32(const Color32 &pColor);
-	Color32(const Color32 &pColor, Uint8 pAlpha);
-	explicit Color32(Uint32 pColor);
-	Color32(Uint8 pR, Uint8 pG, Uint8 pB, Uint8 pA = UCHAR_MAX);
-};
-
-Color32 &operator+=(Color32 &pLeft, const Color32 &pRight);
-Color32 &operator-=(Color32 &pLeft, const Color32 &pRight);
-Color32 &operator*=(Color32 &pLeft, const Color32 &pRight);
-Color32 &operator>>=(Color32 &pLeft, Sint32 pRight);
-Color32 &operator<<=(Color32 &pLeft, Sint32 pRight);
-bool operator==(Color32 pLeft, Color32 pRight);
-bool operator!=(const Color32 &pLeft, const Color32 &pRight);
-Color32 operator+(Color32 pLeft, const Color32 &pRight);
-Color32 operator-(Color32 pLeft, const Color32 &pRight);
-Color32 operator*(Color32 pLeft, const Color32 &pRight);
-Color32 operator>>(Color32 pLeft, Sint32 pRight);
-Color32 operator<<(Color32 pLeft, Sint32 pRight);
-
-//
-// BlitPred
-// Abstract functor for inserting custom blit code where
-// supported in Image class.
-//
-class Blender {
-public:
-	virtual Color32 operator()(Color32 pDst, Color32 pSrc) const = 0;
-	virtual ~Blender( void ) {}
-};
-
-//
-// Assign
-// Simply assigns one color to another.
-//
-class Assign : public Blender {
-public:
-	Color32 operator()(Color32 pDst, Color32 pSrc) const {
-		return pSrc;
-	}
-};
-
-//
-// AlphaBlend
-// Blends one color with another based on contents in
-// alpha channel.
-//
-class AlphaBlend : public Blender {
-public:
-	Color32 operator()(Color32 pDst, Color32 pSrc) const {
-		pDst.channels.red += (pSrc.channels.alpha *(pSrc.channels.red -pDst.channels.red) >> CHAR_BIT);
-		pDst.channels.green += (pSrc.channels.alpha *(pSrc.channels.green -pDst.channels.green) >> CHAR_BIT);
-		pDst.channels.blue += (pSrc.channels.alpha *(pSrc.channels.blue -pDst.channels.blue) >> CHAR_BIT);
-		pDst.channels.alpha += (pSrc.channels.alpha *(pSrc.channels.alpha -pDst.channels.alpha) >> CHAR_BIT);
-		return pDst;
-	}
-};
-
-//
-// ColorKey
-// Makes a certain color invisible (alpha not included).
-//
-class ColorKey : public Blender {
-private:
-	Color32 key;
-public:
-	ColorKey(Color32 pColorKey) : key(pColorKey) {}
-	Color32 operator()(Color32 pDst, Color32 pSrc) const {
-		return pSrc==key ? pDst : pSrc;
-	}
-};
-
-//
-// Grayscale
-// Converts the source color to grayscale.
-//
-class Grayscale : public Blender {
-public:
-	Color32 operator()(Color32 pDst, Color32 pSrc) const {
-		const Uint8 Gray = (Uint8)(
-			(float)pSrc.channels.red*0.3f +
-			(float)pSrc.channels.green*0.59f +
-			(float)pSrc.channels.blue*0.11f
-			);
-		return Color32(Gray, Gray, Gray);
-	}
-};
-
-//
-// FillGrayscale
-// Converts the destination color to grayscale.
-//
-class FillGrayscale : public Grayscale {
-public:
-	Color32 operator()(Color32 pDst, Color32 pSrc) const {
-		return Grayscale::operator()(pSrc, pDst);
-	}
-};
-
-//
-// forward declaration
-//
-class Image;
-
-//
-// Sampler
-// Base class for pixel sampling.
-//
-class Sampler {
-public:
-	virtual Color32 operator()(const Image &pImage, float pU, float pV) const = 0;
-	virtual ~Sampler( void ) {}
-};
-
-//
-// Nearest
-// Samples the nearest color. Looks pixelated
-// when stretched out, and looks aliased when
-// compressed to a smaller size than normal.
-//
-class Nearest : public Sampler {
-public:
-	Color32 operator()(const Image &pImage, float pU, float pV) const;
-};
-
-//
-// Bilinear
-// Samples the four closest colors and
-// interpolates between the colors to get the
-// most accurate color. Produces artifacts when
-// used in conjunction with alpha and color key
-// blit predicates.
-//
-class Bilinear : public Sampler {
-public:
-	Color32 operator()(const Image &pImage, float pU, float pV) const;
-};
-
-//
-// Image
-// Class for handling images.
-//
-class Image
-{
-protected:
-	Color32 *pixels;
-	Sint32 width, height;
-public:
-	Image( void ) : pixels((Color32*)0), width(0), height(0)						{}
-	Image(Sint32 pWidth, Sint32 pHeight) : pixels((Color32*)0), width(0), height(0)	{ this->Create(pWidth, pHeight); }
-	Image(const Image &pImage) : pixels((Color32*)0), width(0), height(0)			{ this->Copy(pImage); }
-	virtual ~Image( void )															{ delete [] pixels; } // don't call virtual functions in destructors
-public:
-	virtual void Free( void );
-	virtual bool Create(Sint32 pWidth, Sint32 pHeight);
-	virtual void SetMemory(Color32 *pPix, Sint32 pWidth, Sint32 pHeight);
-	virtual bool Copy(const Image &pImage);
-	virtual bool Load(const std::string &pFile);
-	virtual bool Save(const std::string &pFile) const;
-	virtual bool Convert(const std::string &pFile);
-	virtual void ReverseByteorder( void );
-	virtual void GetRGB(Sint32 pX, Sint32 pY, float &pR, float &pG, float &pB) const;
-	virtual void GetRGBA(Sint32 pX, Sint32 pY, float &pR, float &pG, float &pB, float &pA) const;
-	virtual void SetRGB(Sint32 pX, Sint32 pY, float pR, float pG, float pB);
-	virtual void SetRGBA(Sint32 pX, Sint32 pY, float pR, float pG, float pB, float pA);
-	template < typename Blender_t >
-	void Fill(Sint32 pX1, Sint32 pY1, Sint32 pX2, Sint32 pY2, Color32 pColor, Blender_t &pBlend);
-	template < typename Blender_t >
-	void Line(Sint32 pX1, Sint32 pY1, Color32 pColor1, Sint32 pX2, Sint32 pY2, Color32 pColor2, Blender_t &pBlend);
-	virtual Sint32 GetWidth( void ) const	{ return this->width; }
-	virtual Sint32 GetHeight( void ) const	{ return this->height; }
-	virtual bool IsGood( void ) const		{ return (this->pixels != (Color32*)0); }
-	virtual bool IsBad( void ) const		{ return (this->pixels == (Color32*)0); }
-public:
-	virtual Image &operator=(const Image &pImage);
-	virtual Color32 *operator[](Sint32 pY)				{ return this->pixels + (this->width * pY); }
-	virtual const Color32 *operator[](Sint32 pY) const	{ return this->pixels + (this->width * pY); }
-	virtual operator bool( void ) const					{ return this->IsGood(); }
-public:
-	static const Sint32 MaxDimension = USHRT_MAX;
-public:
-	//
-	// Stream
-	// Class used for streaming native images. There is no
-	// support for streaming non-native images.
-	//
-	class Stream
+	namespace gfx
 	{
-	private:
-		Sint32 width, height;
-		std::string file;
-		Sint32 dataStart;
-	public:
-		void Free( void );
-		bool Load(const std::string &pFile);
-		bool IsGood( void ) const;
-		bool Refresh( void );
-	public:
-		Sint32 GetWidth( void ) const				{ return this->width; }
-		Sint32 GetHeight( void ) const				{ return this->height; }
-		const std::string &GetFile( void ) const	{ return this->file; }
-		Sint32 GetDataStart( void ) const			{ return this->dataStart; }
-		bool IsBad( void ) const					{ return !this->IsGood(); }
-	};
-public:
-	template < typename Blender_t, typename Sampler_t >
-	static void Blit(Image &pDst, Sint32 pDx1, Sint32 pDy1, Sint32 pDx2, Sint32 pDy2, const Image &pSrc, Blender_t &pBlend, Sampler_t &pSample, Sint32 pSx1=0, Sint32 pSy1=0, Sint32 pSx2=Image::MaxDimension, Sint32 pSy2=Image::MaxDimension);
-	template < typename Blender_t >
-	static bool Blit(Image &pDst, Sint32 pDx1, Sint32 pDy1, Sint32 pDx2, Sint32 pDy2, const Image::Stream &pSrc, Blender_t &pBlend, Sint32 pSx1=0, Sint32 pSy1=0, Sint32 pSx2=Image::MaxDimension, Sint32 pSy2=Image::MaxDimension);
-public:
-	virtual void Fill(Sint32 pX1, Sint32 pY1, Sint32 pX2, Sint32 pY2, Color32 pColor)
-	{
-		Assign defBlend;
-		this->Fill(pX1, pY1, pX2, pY2, pColor, defBlend);
-	}
-	virtual void Line(Sint32 pX1, Sint32 pY1, Color32 pColor1, Sint32 pX2, Sint32 pY2, Color32 pColor2)
-	{
-		Assign defBlend;
-		this->Line(pX1, pY1, pColor1, pX2, pY2, pColor2, defBlend);
-	}
-	static void Blit(Image &pDst, Sint32 pDx1, Sint32 pDy1, Sint32 pDx2, Sint32 pDy2, const Image &pSrc, Sint32 pSx1=0, Sint32 pSy1=0, Sint32 pSx2=Image::MaxDimension, Sint32 pSy2=Image::MaxDimension)
-	{
-		Assign defBlend;
-		Nearest defSamp;
-		Image::Blit(pDst, pDx1, pDy1, pDx2, pDy2, pSrc, defBlend, defSamp, pSx1, pSy1, pSx2, pSy2);
-	}
-	template < typename Blender_t >
-	static void Blit(Image &pDst, Sint32 pDx1, Sint32 pDy1, Sint32 pDx2, Sint32 pDy2, const Image &pSrc, Blender_t &pBlend, Sint32 pSx1=0, Sint32 pSy1=0, Sint32 pSx2=Image::MaxDimension, Sint32 pSy2=Image::MaxDimension)
-	{
-		Nearest defSamp;
-		Image::Blit(pDst, pDx1, pDy1, pDx2, pDy2, pSrc, pBlend, defSamp, pSx1, pSy1, pSx2, pSy2);
-	}
-	static bool Blit(Image &pDst, Sint32 pDx1, Sint32 pDy1, Sint32 pDx2, Sint32 pDy2, const Image::Stream &pSrc, Sint32 pSx1=0, Sint32 pSy1=0, Sint32 pSx2=Image::MaxDimension, Sint32 pSy2=Image::MaxDimension)
-	{
-		Assign defBlend;
-		return Image::Blit(pDst, pDx1, pDy1, pDx2, pDy2, pSrc, defBlend, pSx1, pSy1, pSx2, pSy2);
-	}
-};
+		/// @brief Color separated as channels.
+		struct RGBA32
+		{
+			uint8_t red;   // The red component.
+			uint8_t green; // The green component.
+			uint8_t blue;  // The blue component.
+			uint8_t alpha; // The alpha component.
+		};
 
-//
-// Fill
-// Fills the specified area with the specified color using
-// the specified predicate (normal assignment is default).
-//
-template < typename Blender_t >
-void Image::Fill(Sint32 pX1, Sint32 pY1, Sint32 pX2, Sint32 pY2, Color32 pColor, Blender_t &pPred)
-{
-	pX1 = 0>pX1 ? 0 : pX1;
-	pY1 = 0>pY1 ? 0 : pY1;
-	pX2 = width<pX2 ? width : pX2;
-	pY2 = height<pY2 ? height : pY2;
-	
-	Color32 *dst = (*this)[pY1];
-	for (Sint32 y = pY1; y < pY2; ++y, dst += width){
-		for (Sint32 x = pX1; x < pX2; ++x){
-			dst[x] = pPred(dst[x], pColor);
-		}
+		/// @brief A point.
+		struct Point
+		{
+			int32_t x; // The X coordinate.
+			int32_t y; // The Y coordinate.
+		};
+
+		/// @brief A rectangle.
+		struct Rect
+		{
+			Point a; // A point.
+			Point b; // The diagonally adjacent point.
+		};
+
+		struct Image;
+
+		/// @brief Maps a 2D coordinate to a 1D pixel coordinate.
+		typedef int32_t (*Indexer)(const Image&, Point);
+
+		/// @brief Converts 2D coordinates into a 1D pixel coordinate. Assumes the pixels in a source image are stored left to right, and in such that the last pixel of the previous row directly precedes the first pixel in the current row.
+		/// @param src The source image.
+		/// @param p The X,Y coordinate.
+		/// @return The 1D index accessing the requested pixel at the given coordinates in the source image.
+		/// @note The output coordinate is the pixel coordinate, not the index of a byte in the pixel array of the source image. The difference is that under this scheme you can address individual bits in the pixel array for times where pixels do not neatly line up with byte boundaries, for instance when pixels are less than one byte large.
+		int32_t index_linear(const Image &src, Point p);
+
+		/// @brief Converts 2D coordinates into a 1D pixel coordinate. Assumes the pixels in a source image are stored left to right, and in such that the last pixel of the previous row directly precedes the first pixel in the current row. When accessing outside the area of the source image, the coordinates wrap around.
+		/// @param src The source image.
+		/// @param p The X,Y coordinate.
+		/// @return The 1D index accessing the requested pixel at the given coordinates in the source image.
+		/// @note The output coordinate is the pixel coordinate, not the index of a byte in the pixel array of the source image. The difference is that under this scheme you can address individual bits in the pixel array for times where pixels do not neatly line up with byte boundaries, for instance when pixels are less than one byte large.
+		int32_t index_repeat_linear(const Image &src, Point p);
+
+		/// @brief Converts 2D coordinates into a 1D pixel coordinate. Assumes the pixels in a source image are stored in Z/Morton order (a recursive Z pattern).
+		/// @param p The X,Y coordinate.
+		/// @return The 1D index accessing the requested pixel at the given coordinates in the source image.
+		/// @note The output coordinate is the pixel coordinate, not the index of a byte in the pixel array of the source image. The difference is that under this scheme you can address individual bits in the pixel array for times where pixels do not neatly line up with byte boundaries, for instance when pixels are less than one byte large.
+		int32_t index_z(const Image&, Point p);
+
+		/// @brief Converts 2D coordinates into a 1D pixel coordinate. Assumes the pixels in a source image are stored in Z/Morton order (a recursive Z pattern). When accessing outside the area of the source image, the coordinates wrap around.
+		/// @param p The X,Y coordinate.
+		/// @return The 1D index accessing the requested pixel at the given coordinates in the source image.
+		/// @note The output coordinate is the pixel coordinate, not the index of a byte in the pixel array of the source image. The difference is that under this scheme you can address individual bits in the pixel array for times where pixels do not neatly line up with byte boundaries, for instance when pixels are less than one byte large.
+		int32_t index_repeat_z(const Image&, Point p);
+
+		/// @brief Decodes a single pixel in RGBA16 format into RGBA32 format.
+		/// @param pixel The pixel pointer pointing to the start of the pixel.
+		/// @return The decoded RGBA32.
+		RGBA32 decode_RGBA16(const void *pixel);
+
+		/// @brief Decodes a single pixel in RGB24 format into RGBA32 format.
+		/// @param pixel The pixel pointer pointing to the start of the pixel.
+		/// @return The decoded RGBA32.
+		RGBA32 decode_RGB24(const void *pixel);
+
+		/// @brief Decodes a single pixel in RGBA32 format into RGBA32 format.
+		/// @param pixel The pixel pointer pointing to the start of the pixel.
+		/// @return The decoded RGBA32.
+		RGBA32 decode_RGBA32(const void *pixel);
+
+		/// @brief Decodes a single pixel in BGRA16 format into RGBA32 format.
+		/// @param pixel The pixel pointer pointing to the start of the pixel.
+		/// @return The decoded RGBA32.
+		RGBA32 decode_BGRA16(const void *pixel);
+
+		/// @brief Decodes a single pixel in BGR24 format into RGBA32 format.
+		/// @param pixel The pixel pointer pointing to the start of the pixel.
+		/// @return The decoded RGBA32.
+		RGBA32 decode_BGR24(const void *pixel);
+
+		/// @brief Decodes a single pixel in BGRA32 format into RGBA32 format.
+		/// @param pixel The pixel pointer pointing to the start of the pixel.
+		/// @return The decoded RGBA32.
+		RGBA32 decode_BGRA32(const void *pixel);
+
+		/// @brief Decodes a single pixel in ARGB16 format into RGBA32 format.
+		/// @param pixel The pixel pointer pointing to the start of the pixel.
+		/// @return The decoded RGBA32.
+		RGBA32 decode_ARGB16(const void *pixel);
+
+		/// @brief Decodes a single pixel in ARGB32 format into RGBA32 format.
+		/// @param pixel The pixel pointer pointing to the start of the pixel.
+		/// @return The decoded RGBA32.
+		RGBA32 decode_ARGB32(const void *pixel);
+
+		/// @brief Decodes a single pixel in ABGR16 format into RGBA32 format.
+		/// @param pixel The pixel pointer pointing to the start of the pixel.
+		/// @return The decoded RGBA32.
+		RGBA32 decode_ABGR16(const void *pixel);
+
+		/// @brief Decodes a single pixel in ABGR32 format into RGBA32 format.
+		/// @param pixel The pixel pointer pointing to the start of the pixel.
+		/// @return The decoded RGBA32.
+		RGBA32 decode_ABGR32(const void *pixel);
+
+		/// @brief Decodes a single pixel in 1bpp format into RGBA32 format.
+		/// @param pixel The pixel pointer pointing to the start of the pixel.
+		/// @return The decoded RGBA32.
+		uint8_t decode_1bpp(uint8_t pixelx8, int32_t i);
+
+		/// @brief Encodes a RGBA32 color format into RGBA16 format.
+		/// @param color The color to encode.
+		/// @param out The byte index to store the encoded pixel.
+		void encode_RGBA16(RGBA32 color, void *out);
+
+		/// @brief Encodes a RGBA32 color format into RGB24 format.
+		/// @param color The color to encode.
+		/// @param out The byte index to store the encoded pixel.
+		void encode_RGB24(RGBA32 color, void *out);
+
+		/// @brief Encodes a RGBA32 color format into RGBA32 format.
+		/// @param color The color to encode.
+		/// @param out The byte index to store the encoded pixel.
+		void encode_RGBA32(RGBA32 color, void *out);
+
+		/// @brief Encodes a RGBA32 color format into BGRA16 format.
+		/// @param color The color to encode.
+		/// @param out The byte index to store the encoded pixel.
+		void encode_BGRA16(RGBA32 color, void *out);
+
+		/// @brief Encodes a RGBA32 color format into BGR24 format.
+		/// @param color The color to encode.
+		/// @param out The byte index to store the encoded pixel.
+		void encode_BGR24(RGBA32 color, void *out);
+
+		/// @brief Encodes a RGBA32 color format into BGRA32 format.
+		/// @param color The color to encode.
+		/// @param out The byte index to store the encoded pixel.
+		void encode_BGRA32(RGBA32 color, void *out);
+
+		/// @brief Encodes a RGBA32 color format into ARGB16 format.
+		/// @param color The color to encode.
+		/// @param out The byte index to store the encoded pixel.
+		void encode_ARGB16(RGBA32 color, void *out);
+
+		/// @brief Encodes a RGBA32 color format into ARGB32 format.
+		/// @param color The color to encode.
+		/// @param out The byte index to store the encoded pixel.
+		void encode_ARGB32(RGBA32 color, void *out);
+
+		/// @brief Encodes a RGBA32 color format into ABGR16 format.
+		/// @param color The color to encode.
+		/// @param out The byte index to store the encoded pixel.
+		void encode_ABGR16(RGBA32 color, void *out);
+
+		/// @brief Encodes a RGBA32 color format into ABGR32 format.
+		/// @param color The color to encode.
+		/// @param out The byte index to store the encoded pixel.
+		void encode_ABGR32(RGBA32 color, void *out);
+
+		/// @brief Encodes a RGBA32 color format into 1bpp format.
+		/// @param color The color to encode.
+		/// @param out The byte index to store the encoded pixel.
+		void encode_1bpp(uint8_t color, void *out, int32_t i);
+
+		/// @brief Decodes a pixel pointer parameter into a color and returns it.
+		typedef RGBA32 (*Decoder)(const Image&, Point);
+
+		/// @brief Decodes a single pixel in RGBA16 format into RGBA32 format.
+		/// @param src The source image to pick a pixel from.
+		/// @param p The X,Y coordinate of the pixel.
+		/// @return The decoded RGBA32.
+		RGBA32 decode_RGBA16(const Image &src, Point p);
+
+		/// @brief Decodes a single pixel in RGB24 format into RGBA32 format.
+		/// @param src The source image to pick a pixel from.
+		/// @param p The X,Y coordinate of the pixel.
+		/// @return The decoded RGBA32.
+		RGBA32 decode_RGB24(const Image &src, Point p);
+
+		/// @brief Decodes a single pixel in RGBA32 format into RGBA32 format.
+		/// @param src The source image to pick a pixel from.
+		/// @param p The X,Y coordinate of the pixel.
+		/// @return The decoded RGBA32.
+		RGBA32 decode_RGBA32(const Image &src, Point p);
+
+		/// @brief Decodes a single pixel in BGRA16 format into RGBA32 format.
+		/// @param src The source image to pick a pixel from.
+		/// @param p The X,Y coordinate of the pixel.
+		/// @return The decoded RGBA32.
+		RGBA32 decode_BGRA16(const Image &src, Point p);
+
+		/// @brief Decodes a single pixel in BGR24 format into RGBA32 format.
+		/// @param src The source image to pick a pixel from.
+		/// @param p The X,Y coordinate of the pixel.
+		/// @return The decoded RGBA32.
+		RGBA32 decode_BGR24(const Image &src, Point p);
+
+		/// @brief Decodes a single pixel in BGRA32 format into RGBA32 format.
+		/// @param src The source image to pick a pixel from.
+		/// @param p The X,Y coordinate of the pixel.
+		/// @return The decoded RGBA32.
+		RGBA32 decode_BGRA32(const Image &src, Point p);
+
+		/// @brief Decodes a single pixel in ARGB16 format into RGBA32 format.
+		/// @param src The source image to pick a pixel from.
+		/// @param p The X,Y coordinate of the pixel.
+		/// @return The decoded RGBA32.
+		RGBA32 decode_ARGB16(const Image &src, Point p);
+
+		/// @brief Decodes a single pixel in ARGB32 format into RGBA32 format.
+		/// @param src The source image to pick a pixel from.
+		/// @param p The X,Y coordinate of the pixel.
+		/// @return The decoded RGBA32.
+		RGBA32 decode_ARGB32(const Image &src, Point p);
+
+		/// @brief Decodes a single pixel in ABGR16 format into RGBA32 format.
+		/// @param src The source image to pick a pixel from.
+		/// @param p The X,Y coordinate of the pixel.
+		/// @return The decoded RGBA32.
+		RGBA32 decode_ABGR16(const Image &src, Point p);
+
+		/// @brief Decodes a single pixel in ABGR32 format into RGBA32 format.
+		/// @param src The source image to pick a pixel from.
+		/// @param p The X,Y coordinate of the pixel.
+		/// @return The decoded RGBA32.
+		RGBA32 decode_ABGR32(const Image &src, Point p);
+
+		/// @brief Decodes a single pixel in 1bpp format into RGBA32 format.
+		/// @param src The source image to pick a pixel from.
+		/// @param p The X,Y coordinate of the pixel.
+		/// @return The decoded RGBA32.
+		RGBA32 decode_1bpp(const Image &src, Point p);
+
+		/// @brief Encodes a color into the pixel pointer parameter.
+		typedef void (*Encoder)(Image&, Point, RGBA32);
+
+		/// @brief Encodes a RGBA32 color format into RGBA16 format and stores it in an image.
+		/// @param dst The destination image to store the encoded pixel in.
+		/// @param p The X,Y coordinate of the pixel.
+		/// @param color The color to encode.
+		void encode_RGBA16(Image &dst, Point p, RGBA32 color);
+
+		/// @brief Encodes a RGBA32 color format into RGB24 format and stores it in an image.
+		/// @param dst The destination image to store the encoded pixel in.
+		/// @param p The X,Y coordinate of the pixel.
+		/// @param color The color to encode.
+		void encode_RGB24(Image &dst, Point p, RGBA32 color);
+
+		/// @brief Encodes a RGBA32 color format into RGBA32 format and stores it in an image.
+		/// @param dst The destination image to store the encoded pixel in.
+		/// @param p The X,Y coordinate of the pixel.
+		/// @param color The color to encode.
+		void encode_RGBA32(Image &dst, Point p, RGBA32 color);
+
+		/// @brief Encodes a RGBA32 color format into BGRA16 format and stores it in an image.
+		/// @param dst The destination image to store the encoded pixel in.
+		/// @param p The X,Y coordinate of the pixel.
+		/// @param color The color to encode.
+		void encode_BGRA16(Image &dst, Point p, RGBA32 color);
+
+		/// @brief Encodes a RGBA32 color format into RGB24 format and stores it in an image.
+		/// @param dst The destination image to store the encoded pixel in.
+		/// @param p The X,Y coordinate of the pixel.
+		/// @param color The color to encode.
+		void encode_BGR24(Image &dst, Point p, RGBA32 color);
+
+		/// @brief Encodes a RGBA32 color format into BGRA32 format and stores it in an image.
+		/// @param dst The destination image to store the encoded pixel in.
+		/// @param p The X,Y coordinate of the pixel.
+		/// @param color The color to encode.
+		void encode_BGRA32(Image &dst, Point p, RGBA32 color);
+
+		/// @brief Encodes a RGBA32 color format into ARGB16 format and stores it in an image.
+		/// @param dst The destination image to store the encoded pixel in.
+		/// @param p The X,Y coordinate of the pixel.
+		/// @param color The color to encode.
+		void encode_ARGB16(Image &dst, Point p, RGBA32 color);
+
+		/// @brief Encodes a RGBA32 color format into ARGB32 format and stores it in an image.
+		/// @param dst The destination image to store the encoded pixel in.
+		/// @param p The X,Y coordinate of the pixel.
+		/// @param color The color to encode.
+		void encode_ARGB32(Image &dst, Point p, RGBA32 color);
+
+		/// @brief Encodes a RGBA32 color format into ABGR16 format and stores it in an image.
+		/// @param dst The destination image to store the encoded pixel in.
+		/// @param p The X,Y coordinate of the pixel.
+		/// @param color The color to encode.
+		void encode_ABGR16(Image &dst, Point p, RGBA32 color);
+
+		/// @brief Encodes a RGBA32 color format into ABGR32 format and stores it in an image.
+		/// @param dst The destination image to store the encoded pixel in.
+		/// @param p The X,Y coordinate of the pixel.
+		/// @param color The color to encode.
+		void encode_ABGR32(Image &dst, Point p, RGBA32 color);
+
+		/// @brief Encodes a RGBA32 color format into 1bpp format and stores it in an image.
+		/// @param dst The destination image to store the encoded pixel in.
+		/// @param p The X,Y coordinate of the pixel.
+		/// @param color The color to encode.
+		void encode_1bpp(Image &dst, Point p, RGBA32 color);
+
+		/// @brief Blends a source color and a destination color and returns the result.
+		typedef RGBA32 (*Shader)(RGBA32, RGBA32);
+
+		/// @brief Simply returns the source color. The destination color is always discarded.
+		/// @param dst The destination color in the location to be written.
+		/// @param src The source color in the location being read from.
+		/// @return The final color.
+		RGBA32 shade_set(RGBA32 dst, RGBA32 src);
+
+		/// @brief Blends the source and destination color based on the source alpha component via linear interpolation.
+		/// @param dst The destination color in the location to be written.
+		/// @param src The source color in the location being read from.
+		/// @return The final color.
+		RGBA32 shade_alpha(RGBA32 dst, RGBA32 src);
+
+		/// @brief A shader that returns the source color if it is not the same as a given color key. Returns the destination color otherwise.
+		/// @param dst The destination color in the location to be written.
+		/// @param src The source color in the location being read from.
+		/// @return The final color.
+		RGBA32 shade_colorkey(RGBA32 dst, RGBA32 src);
+
+		/// @brief Returns a grayscale variant of the source color. The destination color is always discarded.
+		/// @param dst The destination color in the location to be written.
+		/// @param src The source color in the location being read from.
+		/// @return The final color.
+		RGBA32 shade_gray(RGBA32 dst, RGBA32 src);
+
+		/// @brief Returns a grayscale variant of the source color, blended with the destination color based on the source alpha component via linear interpolation.
+		/// @param dst The destination color in the location to be written.
+		/// @param src The source color in the location being read from.
+		/// @return The final color.
+		RGBA32 shade_grayalpha(RGBA32 dst, RGBA32 src);
+
+		/// @brief A shader that returns the grayscale source color if it is not the same as a given color key prior to grayscale conversion. Returns the destination color otherwise.
+		/// @param dst The destination color in the location to be written.
+		/// @param src The source color in the location being read from.
+		/// @return The final color.
+		RGBA32 shade_graycolorkey(RGBA32 dst, RGBA32 src);
+
+		/// @brief A shader that sets the destination color if its alpha is greater than 0, and the source color otherwise.
+		/// @param dst The destination color in the location to be written.
+		/// @param src The source color in the location being read from.
+		/// @return The final color.
+		RGBA32 shade_stencil(RGBA32 dst, RGBA32 src);
+
+		/// @brief Uses normalized image coordinates [0-1] to sample one or several colors from an image and return some blended result.
+		typedef RGBA32 (*Sampler)(const Image&, float, float);
+
+		/// @brief Samples the nearest color. Looks pixelated when stretched out, and looks aliased when compressed to a smaller size than normal.
+		/// @param src The source image to sample from.
+		/// @param u The U coordinate to sample from, in normalized image space [0-1].
+		/// @param v The V coordinate to sample from, in normalized image space [0-1].
+		/// @return The final sampled color.
+		RGBA32 sample_nearest(const Image &src, float u, float v);
+
+		/// @brief Samples the four closest colors and interpolates between the colors to get the most accurate color.
+		/// @param src The source image to sample from.
+		/// @param u The U coordinate to sample from, in normalized image space [0-1].
+		/// @param v The V coordinate to sample from, in normalized image space [0-1].
+		/// @return The final sampled color.
+		RGBA32 sample_bilinear(const Image &src, float u, float v);
+
+		/// @brief Uses image coordinates (16.15 fixed point) to sample one or several colors from an image and return some blended result.
+		typedef RGBA32 (*ISampler)(const Image&, int32_t, int32_t);
+
+		/// @brief Samples the nearest color. Looks pixelated when stretched out, and looks aliased when compressed to a smaller size than normal.
+		/// @param src The source image to sample from.
+		/// @param u The U coordinate to sample from (16.15 fixed-point format).
+		/// @param v The V coordinate to sample from (16.15 fixed-point format).
+		/// @return The final sampled color.
+		RGBA32 sample_nearest(const Image &src, int32_t u, int32_t v);
+
+		/// @brief Samples the four closest colors and interpolates between the colors to get the most accurate color.
+		/// @param src The source image to sample from.
+		/// @param u The U coordinate to sample from (16.15 fixed-point format).
+		/// @param v The V coordinate to sample from (16.15 fixed-point format).
+		/// @return The final sampled color.
+		RGBA32 sample_bilinear(const Image &src, int32_t u, int32_t v);
+
+		/// @brief An image container. The container is mostly a convenience, and does not own its own memory, and is unaware how to decode and encode pixels as well as how to index tbe pixel data given 2D coordinates.
+		struct Image
+		{
+			uint8_t *pixels; // A pixel array containing the color information of the image. May also contain other types of data (such as RLE header) as long as the encoder, decoder, and indexer can traverse the data.
+			int32_t  width;  // The width, in pixels, of the image.
+			int32_t  height; // The height, in pixels, of the image.
+			Encoder  encode; // The function used to encode a RGB32 into a native pixel format.
+			Decoder  decode; // The function used to decode the native pixel format into a RGB32.
+			Indexer  index;  // The function used to map a 2D coordinate to a singular pixel.
+
+			static constexpr int32_t MAX_DIMENSION = USHRT_MAX; // The maximally supported single dimension of an image.
+		};
+
+		/// @brief Creates a new image with the provided data.
+		/// @param pixels The pointer to the image data, mainly containing colors, but could contain any image data.
+		/// @param width The width, in pixels, of the image.
+		/// @param height The height, in pixels, of the image.
+		/// @param bytes_per_pixel The number of bytes used per pixel. If the number of bytes used is less than one per pixel, or is variable, this should be 0.
+		/// @param encoder The encoder function that transforms a color from RGBA32 into the image's native format.
+		/// @param decoder The decoder function that transforms a color from the image's native format into RGBA32.
+		/// @param indexer The indexer function that transforms a 2D coordinate into a 1D pixel coordinate.
+		/// @return A new image.
+		Image new_image(void *pixels, int32_t width, int32_t height, int32_t bytes_per_pixel, Encoder encoder, Decoder decoder, Indexer indexer);
+
+		/// @brief Returns a color at the given coordinates from an image.
+		/// @param src The image to get the color from.
+		/// @param p The X,Y coordinate to get the color from.
+		/// @return The color at the given coordinate.
+		RGBA32 get_color(const Image &src, Point p);
+
+		/// @brief Sets the color of a pixel at a given integer coordinate of an image.
+		/// @param dst The image to set the color to.
+		/// @param p The X,Y coordinate of the color to set.
+		/// @param c The color.
+		void set_color(Image &dst, Point p, RGBA32 c);
+
+		/// @brief Fills the specified area with the specified color using the specified predicate (normal assignment is default).
+		/// @param dst The destination image.
+		/// @param dst_rect The region to fill.
+		/// @param color The input color.
+		/// @param shader The shader to use to blend colors.
+		void fill_rect(Image &dst, Rect dst_rect, RGBA32 color, Shader shader = shade_set);
+
+		/// @brief Draws a line between the two specified points using the two specified colors and the specified predicate (normal assignment is default).
+		/// @param pDst The destination image.
+		/// @param pX1 The first X coordinate.
+		/// @param pY1 The first Y coordinate.
+		/// @param pColor1 The first color.
+		/// @param pX2 The second X coordinate.
+		/// @param pY2 The second Y coordinate.
+		/// @param pColor2 The second color.
+		/// @param shader The shader to use to blend colors.
+		void draw_line(Image &pDst, int32_t pX1, int32_t pY1, RGBA32 pColor1, int32_t pX2, int32_t pY2, RGBA32 pColor2, Shader shader);
+
+		/// @brief Stretches a portion of a source image over the portion of a destination image.
+		/// @param dst The destination image.
+		/// @param dst_rect The area on the destination image over which the selected source region will be stretched. The region is automatically clipped to the maximally allowed dimensions on the destination image.
+		/// @param src The source image.
+		/// @param src_rect The area on the source image to stretch over the selected destination region. The entire source image is selected by default. The region is automatically clipped to the maximally allowed dimensions on the source image.
+		/// @param write_rect The area on the destination image that is writeable. All rendering outside this area is discarded. The entire destination image is selected by default. The region is automatically clipped to the maximally allowed dimensions on the destination image.
+		void stretch_image(Image &dst, Rect dst_rect, const Image &src, Rect src_rect = Rect{ Point{ 0, 0 }, Point{ Image::MAX_DIMENSION, Image::MAX_DIMENSION } }, Rect write_rect = Rect{ Point{ 0, 0 }, Point{ Image::MAX_DIMENSION, Image::MAX_DIMENSION } });
+
+		/// @brief Stretches a portion of a source image over the portion of a destination image.
+		/// @param dst The destination image.
+		/// @param dst_rect The area on the destination image over which the selected source region will be stretched. The region is automatically clipped to the maximally allowed dimensions on the destination image.
+		/// @param src The source image.
+		/// @param shader The shader to use to blend colors.
+		/// @param sampler The sampler to use on the source image to sample colors.
+		/// @param src_rect The area on the source image to stretch over the selected destination region. The entire source image is selected by default. The region is automatically clipped to the maximally allowed dimensions on the source image.
+		/// @param write_rect The area on the destination image that is writeable. All rendering outside this area is discarded. The entire destination image is selected by default. The region is automatically clipped to the maximally allowed dimensions on the destination image.
+		void stretch_image(Image &dst, Rect dst_rect, const Image &src, Shader shader, ISampler sampler, Rect src_rect = Rect{ Point{ 0, 0 }, Point{ Image::MAX_DIMENSION, Image::MAX_DIMENSION } }, Rect write_rect = Rect{ Point{ 0, 0 }, Point{ Image::MAX_DIMENSION, Image::MAX_DIMENSION } });
+
+		/// @brief Blits specified portion of an image (pSrc) to specified portion of another image (pDst) using a predicate (default normal assignment). If the source portion is larger or smaller than destination portion, then resizing will occur.
+		/// @param pDst The destination image.
+		/// @param pDx1 The first X coordinate of the region on the destination image to which to draw the source image region.
+		/// @param pDy1 The first Y coordinate of the region on the destination image to which to draw the source image region.
+		/// @param pDx2 The second X coordinate of the region on the destination image to which to draw the source image region.
+		/// @param pDy2 The second Y coordinate of the region on the destination image to which to draw the source image region.
+		/// @param pSrc The source image.
+		/// @param shader The shader to use to blend colors.
+		/// @param sampler The sampler to use on the source image to sample colors.
+		/// @param pSx1 The first X coordinate of the region from the source image to draw to the destination image region.
+		/// @param pSy1 The first Y coordinate of the region from the source image to draw to the destination image region.
+		/// @param pSx2 The second X coordinate of the region from the source image to draw to the destination image region.
+		/// @param pSy2 The second Y coordinate of the region from the source image to draw to the destination image region.
+		void draw_image(Image &pDst, int32_t pDx1, int32_t pDy1, int32_t pDx2, int32_t pDy2, const Image &pSrc, Shader shader, Sampler sampler, int32_t pSx1 = 0, int32_t pSy1 = 0, int32_t pSx2 = Image::MAX_DIMENSION, int32_t pSy2 = Image::MAX_DIMENSION);
+
+		/// @brief Draws text using the built-in font on the 
+		/// @param dst The target image.
+		/// @param x The X coordinate of the first character of text.
+		/// @param y The Y coordinate of the first character of text.
+		/// @param text The text.
+		/// @param text_len The number of characters in the text.
+		/// @param color The color to render the text in.
+		/// @param scale The scale of the text.
+		/// @return The X coordinate past the last character of the input string.
+		/// @note This uses only a built-in font, but the effect can be replicated using any bitfont using the draw_image function and the 1bpp encoder/decoder functions.
+		int32_t text(Image &dst, Point p, const char *text, int32_t text_len, RGBA32 color, int32_t scale = 1);
+
+		// [ ] draw_triangle
 	}
 }
-
-//
-// Line
-// Draws a line between the two specified points using the
-// two specified colors and the specified predicate (normal
-// assignment is default).
-//
-template < typename Blender_t >
-void Image::Line(Sint32 pX1, Sint32 pY1, Color32 pColor1, Sint32 pX2, Sint32 pY2, Color32 pColor2, Blender_t &pPred)
-{
-	float r1 = pColor1.channels.red;
-	float g1 = pColor1.channels.green;
-	float b1 = pColor1.channels.blue;
-	float a1 = pColor1.channels.alpha;
-	float r2 = pColor2.channels.red;
-	float g2 = pColor2.channels.green;
-	float b2 = pColor2.channels.blue;
-	float a2 = pColor2.channels.alpha;
-	
-	float xdiff = (float)(pX2 - pX1);
-	float ydiff = (float)(pY2 - pY1);
-	
-	if(xdiff == 0.f && ydiff == 0.f) {
-		if (pX1 >= 0 && pX1 < width && pY1 >= 0 && pY1 < height){
-			Color32 color((Uint8)r1, (Uint8)g1, (Uint8)b1, (Uint8)a1);
-			(*this)[pY1][pX1] = pPred((*this)[pY1][pX1], color);
-		}
-		return;
-	}
-	
-	if(fabs(xdiff) > fabs(ydiff)) {
-		float xmin, xmax;
-		
-		// set xmin to the lower x value given
-		// and xmax to the higher value
-		if(pX1 < pX2) {
-			xmin = (float)pX1;
-			xmax = (float)pX2;
-		} else {
-			xmin = (float)pX2;
-			xmax = (float)pX1;
-		}
-		xmin = xmin>0.f ? xmin : 0.f; // clipping
-		xmax = xmax<(width-1) ? xmax : (width-1); // clipping
-		
-		// draw line in terms of y slope
-		float slope = ydiff / xdiff;
-		for(float x = xmin; x <= xmax; x += 1.f) {
-			float y = pY1 + ((x - pX1) * slope);
-			if (y < 0.f || y >= height) continue; // clipping
-			Color32 color(
-						  (Uint8)(r1 + ((r2 - r1) * ((x -pX1) / xdiff))),
-						  (Uint8)(g1 + ((g2 - g1) * ((x -pX1) / xdiff))),
-						  (Uint8)(b1 + ((b2 - b1) * ((x -pX1) / xdiff))),
-						  (Uint8)(a1 + ((a2 - a1) * ((x -pX1) / xdiff)))
-						  );
-			(*this)[(Sint32)y][(Sint32)x] = pPred((*this)[(Sint32)y][(Sint32)x], color);
-		}
-	} else {
-		float ymin, ymax;
-		
-		// set ymin to the lower y value given
-		// and ymax to the higher value
-		if(pY1 < pY2) {
-			ymin = (float)pY1;
-			ymax = (float)pY2;
-		} else {
-			ymin = (float)pY2;
-			ymax = (float)pY1;
-		}
-		ymin = ymin>0.f ? ymin : 0.f; // clipping
-		ymax = ymax<(height-1) ? ymax : (height-1); // clipping
-		
-		// draw line in terms of x slope
-		float slope = xdiff / ydiff;
-		for(float y = ymin; y <= ymax; y += 1.f) {
-			float x = pX1 + ((y - pY1) * slope);
-			if (x < 0.f || x >= width) continue; // clipping
-			Color32 color(
-						  (Uint8)(r1 + ((r2 - r1) * ((y -pY1) / ydiff))),
-						  (Uint8)(g1 + ((g2 - g1) * ((y -pY1) / ydiff))),
-						  (Uint8)(b1 + ((b2 - b1) * ((y -pY1) / ydiff))),
-						  (Uint8)(a1 + ((a2 - a1) * ((y -pY1) / ydiff)))
-						  );
-			(*this)[(Sint32)y][(Sint32)x] = pPred((*this)[(Sint32)y][(Sint32)x], color);
-		}
-	}
-}
-
-//
-// Blit
-// Blits specified portion of an image (pSrc) to specified
-// portion of another image (pDst) using a predicate
-// (default normal assignment). If the source portion is
-// larger or smaller than destination portion, then resizing
-// will occur.
-//
-template < typename Blender_t, typename Sampler_t >
-void Image::Blit(Image &pDst, Sint32 pDx1, Sint32 pDy1, Sint32 pDx2, Sint32 pDy2, const Image &pSrc, Blender_t &pBlend, Sampler_t &pSample, Sint32 pSx1, Sint32 pSy1, Sint32 pSx2, Sint32 pSy2)
-{
-	if (pSrc.IsBad() || pDst.IsBad()) {
-		SDL_SetError("Blit: Bad source/destination");
-		return;
-	}
-	
-	// clip pSrcRect against max borders
-	pSx1 = 0>pSx1 ? 0 : pSx1;
-	pSy1 = 0>pSy1 ? 0 : pSy1;
-	pSx2 = pSrc.GetWidth()<pSx2 ? pSrc.GetWidth() : pSx2;
-	pSy2 = pSrc.GetHeight()<pSy2 ? pSrc.GetHeight() : pSy2;
-	
-	float u1 = (float)pSx1 / (float)(pSrc.GetWidth()-1);
-	float v1 = (float)pSy1 / (float)(pSrc.GetHeight()-1);
-	float u2 = (float)pSx2 / (float)(pSrc.GetWidth()-1);
-	float v2 = (float)pSy2 / (float)(pSrc.GetHeight()-1);
-	float du = (u2 - u1) / (float)(pDx2 - pDx1);
-	float dv = (v2 - v1) / (float)(pDy2 - pDy1);
-	
-	// enable a negative writable area on pDst (flips blit direction)	
-	if (pDx2 < pDx1) {
-		Sint32 itemp = pDx1;
-		pDx1 = pDx2;
-		pDx2 = itemp;
-		float ftemp = u1;
-		u1 = u2;
-		u2 = ftemp;
-		if (pDx1 < 0) { // make read offset for pSrc + clip against min borders
-			u1 = u1 - du * pDx1;
-			pDx1 = 0;
-		}
-	} else if (pDx1 < 0) { // make read offset for pSrc + clip against min borders
-		u1 = u1 + du * -pDx1;
-		pDx1 = 0;
-	}
-	if (pDy2 < pDy1) {
-		Sint32 itemp = pDy1;
-		pDy1 = pDy2;
-		pDy2 = itemp;
-		float ftemp = v1;
-		v1 = v2;
-		v2 = ftemp;
-		if (pDy1 < 0) { // make read offset for pSrc + clip against min borders
-			v1 = v1 - dv * pDy1;
-			pDy1 = 0;
-		}
-	} else if (pDy1 < 0) { // make read offset for pSrc + clip against min borders
-		v1 = v1 + dv * -pDy1;
-		pDy1 = 0;
-	}
-	
-	// clip pDstRect agains max borders
-	pDx2 = pDst.GetWidth()<pDx2 ? pDst.GetWidth() : pDx2;
-	pDy2 = pDst.GetHeight()<pDy2 ? pDst.GetHeight() : pDy2;
-	
-	// determine writable area
-	const Sint32 MAXY = pDy2 -pDy1;
-	const Sint32 MAXX = pDx2 -pDx1;
-	if (MAXX < 0 || MAXY < 0) { return; } // readable area is negative (probably because pSrc is offscreen)
-	
-	Color32 *dpix = pDst[pDy1];
-	const Sint32 DST_WIDTH = pDst.GetWidth();
-	
-	// draw scanlines
-	float v = v1;
-	for (Sint32 y = 0; y < MAXY; ++y, dpix+=DST_WIDTH){
-		float u = u1;
-		for (Sint32 x = 0; x < MAXX; ++x){
-			dpix[x+pDx1] = pBlend(dpix[x+pDx1], pSample(pSrc, u, v));
-			//dpix[x+pDx1] = pSrc[(Sint32)((pSrc.GetHeight()-1)*v)][(Sint32)((pSrc.GetWidth()-1)*u)];
-			u+=du;
-		}
-		v+=dv;
-	}
-}
-
-//
-// Blit
-// Blits (streams) specified portion of a file (pSrc) to
-// specified portion of an image (pDst) using a predicate
-// (default normal assignment). If the source portion is
-// larger or smaller than destination portion, then
-// resizing will occur.
-//
-template < typename Blender_t >
-bool Image::Blit(Image &pDst, Sint32 pDx1, Sint32 pDy1, Sint32 pDx2, Sint32 pDy2, const Image::Stream &pSrc, Blender_t &pBlend, Sint32 pSx1, Sint32 pSy1, Sint32 pSx2, Sint32 pSy2)
-{
-	// clip pSrcRect against max borders
-	pSx1 = 0>pSx1 ? 0 : pSx1;
-	pSy1 = 0>pSy1 ? 0 : pSy1;
-	pSx2 = pSrc.GetWidth()<pSx2 ? pSrc.GetWidth() : pSx2;
-	pSy2 = pSrc.GetHeight()<pSy2 ? pSrc.GetHeight() : pSy2;
-	
-	const Sint32 SCALEX = (Sint32)((float)(pSx2 -pSx1) /(float)(pDx2 -pDx1) *(1<<16));
-	const Sint32 SCALEY = (Sint32)((float)(pSy2 -pSy1) /(float)(pDy2 -pDy1) *(1<<16));
-	
-	// make read offset for pSrc
-	Sint32 sx = 0;
-	Sint32 sy = 0;
-	if (pDx1 < 0) { sx = -pDx1; }
-	if (pDy1 < 0) { sy = -pDy1; }
-	
-	// clip pDstRect agains max borders
-	pDx1 = 0>pDx1 ? 0 : pDx1;
-	pDy1 = 0>pDy1 ? 0 : pDy1;
-	pDx2 = pDst.GetWidth()<pDx2 ? pDst.GetWidth() : pDx2;
-	pDy2 = pDst.GetHeight()<pDy2 ? pDst.GetHeight() : pDy2;
-	
-	// determine writable area
-	const Sint32 MAXY = pDy2 -pDy1;
-	const Sint32 MAXX = pDx2 -pDx1;
-	if (MAXX < 0 || MAXY < 0) {  return true; } // readable area is negative (probably because pSrc is offscreen)
-	
-	Color32 *dpix = pDst[pDy1];
-	const Sint32 DST_WIDTH = pDst.GetWidth();
-	const Sint32 SrcTypeSize = sizeof(Color32);
-	const Sint32 SrcXByteRead = ((pSx2 -pSx1) *SrcTypeSize)>0 ? ((pSx2 -pSx1) *SrcTypeSize) : 0;
-	const Sint32 SrcByteWidth = pSrc.GetWidth()*SrcTypeSize;
-	const Sint32 SrcXOffset = (pSx1 *SrcTypeSize) + pSrc.GetDataStart();
-	
-	// allocate memory
-	Color32 *spix = new Color32[pSx2 -pSx1]; // I trust this will not fail, even if that might be the case
-	
-	// open file stream (in)
-	std::ifstream fin(pSrc.GetFile().c_str(), std::ios::binary);
-	if (!fin.is_open()) { return false; } // file could not be opened
-	
-	// draw scanlines
-	for (Sint32 y = 0; y < MAXY; ++y, dpix+=DST_WIDTH){
-		fin.seekg( (std::streamoff)(((((SCALEY*(y+sy))>>16)+pSy1)*SrcByteWidth) + SrcXOffset) ); // NOTE: Might not be able to access bytes beyond the INT32_MAX limit.
-		fin.read((char*)spix, SrcXByteRead);
-		for (Sint32 x = 0; x < MAXX; ++x){
-			dpix[x+pDx1] = pBlend(dpix[x+pDx1], spix[((SCALEX*(x+sx))>>16)]);
-		}
-	}
-	delete [] spix;
-	fin.close();
-	return true;
-}
-
-//
-// Screen functions
-//
-bool GfxSetVideo(Uint32 pScreenW, Uint32 pScreenH, bool pFullscreen);
-bool GfxFlip(const Image &pSrc);
-inline Sint32 GfxWidth( void ) { return SDL_GetVideoSurface()->w; }
-inline Sint32 GfxHeight( void ) { return SDL_GetVideoSurface()->h; }
-inline Color32 *GfxPixels( void ) { return (Color32*)SDL_GetVideoSurface()->pixels; }
 
 #endif
