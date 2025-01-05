@@ -860,11 +860,13 @@ int32_t cc0::gfx::print_text(cc0::gfx::Image &dst, cc0::gfx::Point p, const char
 		FONT_ATLAS_CHAR_WIDTH_COUNT * FONT_CELL_PX_WIDTH, FONT_ATLAS_CHAR_HEIGHT_COUNT * FONT_CELL_PX_HEIGHT, 0,
 		encode_1bpp, decode_1bpp, index_linear
 	);
-	for (int32_t i = 0; i < text_len && text[i] != 0; ++i, p.x += FONT_CHAR_PX_WIDTH) {
+	const int32_t CHAR_DST_WIDTH  = FONT_CHAR_PX_WIDTH * scale;
+	const int32_t CHAR_DST_HEIGHT = FONT_CHAR_PX_HEIGHT * scale;
+	for (int32_t i = 0; i < text_len && text[i] != 0; ++i, p.x += CHAR_DST_WIDTH) {
 		if (text[i] != ' ') {
 			const int32_t sy = FONT_CELL_PX_HEIGHT * ((int32_t)text[i] - FONT_CHAR_ASCII_START);
 			stretch_image(
-				dst, Rect{ Point{ p.x, p.y }, Point{ p.x + FONT_CELL_PX_WIDTH, p.y + FONT_CELL_PX_HEIGHT } },
+				dst, Rect{ Point{ p.x, p.y }, Point{ p.x + CHAR_DST_WIDTH, p.y + CHAR_DST_HEIGHT } },
 				src, shade_stencil, sample_nearest, Rect{ Point{ 0, sy }, Point{ FONT_CELL_PX_WIDTH, sy + FONT_CELL_PX_HEIGHT } }
 			);
 		}
