@@ -18,6 +18,16 @@ namespace cc0
 			uint8_t alpha; // The alpha component.
 		};
 
+		static const RGBA32 COLOR_WHITE   = { 255, 255, 255, 255 };
+		static const RGBA32 COLOR_BLACK   = { 0, 0, 0, 255 };
+		static const RGBA32 COLOR_RED     = { 255, 0, 0, 255 };
+		static const RGBA32 COLOR_GREEN   = { 0, 255, 0, 255 };
+		static const RGBA32 COLOR_BLUE    = { 0, 0, 255, 255 };
+		static const RGBA32 COLOR_MAGENTA = { 255, 0, 255, 255 };
+		static const RGBA32 COLOR_CYAN    = { 0, 255, 255, 255 };
+		static const RGBA32 COLOR_YELLOW  = { 255, 255, 0, 255 };
+		static const RGBA32 COLOR_GRAY    = { 127, 127, 127, 255 };
+
 		/// @brief A point.
 		struct Point
 		{
@@ -356,25 +366,8 @@ namespace cc0
 		/// @return The final color.
 		RGBA32 shade_stencil(RGBA32 dst, RGBA32 src);
 
-		/// @brief Uses normalized image coordinates [0-1] to sample one or several colors from an image and return some blended result.
-		typedef RGBA32 (*Sampler)(const Image&, float, float);
-
-		/// @brief Samples the nearest color. Looks pixelated when stretched out, and looks aliased when compressed to a smaller size than normal.
-		/// @param src The source image to sample from.
-		/// @param u The U coordinate to sample from, in normalized image space [0-1].
-		/// @param v The V coordinate to sample from, in normalized image space [0-1].
-		/// @return The final sampled color.
-		RGBA32 sample_nearest(const Image &src, float u, float v);
-
-		/// @brief Samples the four closest colors and interpolates between the colors to get the most accurate color.
-		/// @param src The source image to sample from.
-		/// @param u The U coordinate to sample from, in normalized image space [0-1].
-		/// @param v The V coordinate to sample from, in normalized image space [0-1].
-		/// @return The final sampled color.
-		RGBA32 sample_bilinear(const Image &src, float u, float v);
-
 		/// @brief Uses image coordinates (16.15 fixed point) to sample one or several colors from an image and return some blended result.
-		typedef RGBA32 (*ISampler)(const Image&, int32_t, int32_t);
+		typedef RGBA32 (*Sampler)(const Image&, int32_t, int32_t);
 
 		/// @brief Samples the nearest color. Looks pixelated when stretched out, and looks aliased when compressed to a smaller size than normal.
 		/// @param src The source image to sample from.
@@ -460,22 +453,7 @@ namespace cc0
 		/// @param sampler The sampler to use on the source image to sample colors.
 		/// @param src_rect The area on the source image to stretch over the selected destination region. The entire source image is selected by default. The region is automatically clipped to the maximally allowed dimensions on the source image.
 		/// @param write_rect The area on the destination image that is writeable. All rendering outside this area is discarded. The entire destination image is selected by default. The region is automatically clipped to the maximally allowed dimensions on the destination image.
-		void stretch_image(Image &dst, Rect dst_rect, const Image &src, Shader shader, ISampler sampler, Rect src_rect = Rect{ Point{ 0, 0 }, Point{ Image::MAX_DIMENSION, Image::MAX_DIMENSION } }, Rect write_rect = Rect{ Point{ 0, 0 }, Point{ Image::MAX_DIMENSION, Image::MAX_DIMENSION } });
-
-		/// @brief Blits specified portion of an image (pSrc) to specified portion of another image (pDst) using a predicate (default normal assignment). If the source portion is larger or smaller than destination portion, then resizing will occur.
-		/// @param pDst The destination image.
-		/// @param pDx1 The first X coordinate of the region on the destination image to which to draw the source image region.
-		/// @param pDy1 The first Y coordinate of the region on the destination image to which to draw the source image region.
-		/// @param pDx2 The second X coordinate of the region on the destination image to which to draw the source image region.
-		/// @param pDy2 The second Y coordinate of the region on the destination image to which to draw the source image region.
-		/// @param pSrc The source image.
-		/// @param shader The shader to use to blend colors.
-		/// @param sampler The sampler to use on the source image to sample colors.
-		/// @param pSx1 The first X coordinate of the region from the source image to draw to the destination image region.
-		/// @param pSy1 The first Y coordinate of the region from the source image to draw to the destination image region.
-		/// @param pSx2 The second X coordinate of the region from the source image to draw to the destination image region.
-		/// @param pSy2 The second Y coordinate of the region from the source image to draw to the destination image region.
-		void draw_image(Image &pDst, int32_t pDx1, int32_t pDy1, int32_t pDx2, int32_t pDy2, const Image &pSrc, Shader shader, Sampler sampler, int32_t pSx1 = 0, int32_t pSy1 = 0, int32_t pSx2 = Image::MAX_DIMENSION, int32_t pSy2 = Image::MAX_DIMENSION);
+		void stretch_image(Image &dst, Rect dst_rect, const Image &src, Shader shader, Sampler sampler, Rect src_rect = Rect{ Point{ 0, 0 }, Point{ Image::MAX_DIMENSION, Image::MAX_DIMENSION } }, Rect write_rect = Rect{ Point{ 0, 0 }, Point{ Image::MAX_DIMENSION, Image::MAX_DIMENSION } });
 
 		/// @brief Draws text using the built-in font on the 
 		/// @param dst The target image.
@@ -487,7 +465,7 @@ namespace cc0
 		/// @param scale The scale of the text.
 		/// @return The X coordinate past the last character of the input string.
 		/// @note This uses only a built-in font, but the effect can be replicated using any bitfont using the draw_image function and the 1bpp encoder/decoder functions.
-		int32_t text(Image &dst, Point p, const char *text, int32_t text_len, RGBA32 color, int32_t scale = 1);
+		int32_t print_text(Image &dst, Point p, const char *text, int32_t text_len, RGBA32 color, int32_t scale = 1);
 
 		// [ ] draw_triangle
 	}

@@ -75,12 +75,9 @@ static uint8_t FONT_ATLAS[] = { // The font bits as 1 bit per pixel.
 	0xff, 0xeb, 0xf5, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xc1, 0xc1, 0xc1,
 	0xc1, 0xc1, 0xff, 0xff
 };
-#include <iostream>
+
 int32_t cc0::gfx::index_linear(const cc0::gfx::Image &src, cc0::gfx::Point p)
 {
-	if (p.x < 0 || p.y < 0 || p.x >= src.width || p.y >= src.height) {
-		std::cout << p.x << ", " << p.y << std::endl;
-	}
 	return (src.width * p.y) + p.x;
 }
 
@@ -496,35 +493,30 @@ cc0::gfx::RGBA32 cc0::gfx::shade_stencil(cc0::gfx::RGBA32 dst, cc0::gfx::RGBA32 
 	return src.alpha > 0 ? src : dst;
 }
 
-cc0::gfx::RGBA32 cc0::gfx::sample_nearest(const cc0::gfx::Image &pImage, float pU, float pV)
-{
-	return get_color(pImage, Point{ (int32_t)((pImage.width - 1) * pU), (int32_t)((pImage.height - 1) * pV) });
-}
-
-cc0::gfx::RGBA32 cc0::gfx::sample_bilinear(const cc0::gfx::Image &pImage, float pU, float pV)
-{
-	const float   fU = pU * (pImage.width  - 2);
-	const float   fV = pV * (pImage.height - 2);
-	const int32_t iU = (int32_t)fU;
-	const int32_t iV = (int32_t)fV;
-	
-	const float u_ratio    = fU - iU;
-	const float v_ratio    = fV - iV;
-	const float u_opposite = 1.0f - u_ratio;
-	const float v_opposite = 1.0f - v_ratio;
-	
-	const RGBA32 c00 = get_color(pImage, Point{ iU,     iV });
-	const RGBA32 c01 = get_color(pImage, Point{ iU,     iV + 1 });
-	const RGBA32 c10 = get_color(pImage, Point{ iU + 1, iV });
-	const RGBA32 c11 = get_color(pImage, Point{ iU + 1, iV + 1 });
-	
-	return RGBA32{
-		(uint8_t)((c00.red   * u_opposite + c10.red   * u_ratio) * v_opposite + (c01.red   * u_opposite + c11.red   * u_ratio) * v_ratio),
-		(uint8_t)((c00.green * u_opposite + c10.green * u_ratio) * v_opposite + (c01.green * u_opposite + c11.green * u_ratio) * v_ratio),
-		(uint8_t)((c00.blue  * u_opposite + c10.blue  * u_ratio) * v_opposite + (c01.blue  * u_opposite + c11.blue  * u_ratio) * v_ratio),
-		(uint8_t)((c00.alpha * u_opposite + c10.alpha * u_ratio) * v_opposite + (c01.alpha * u_opposite + c11.alpha * u_ratio) * v_ratio)
-	};
-}
+//cc0::gfx::RGBA32 cc0::gfx::sample_bilinear(const cc0::gfx::Image &pImage, float pU, float pV)
+//{
+//	const float   fU = pU * (pImage.width  - 2); // [ ] Similar to how we need to access in the fixed-point version, but width - 1 instead.
+//	const float   fV = pV * (pImage.height - 2); // [ ] Similar to how we need to access in the fixed-point version, but height - 1 instead.
+//	const int32_t iU = (int32_t)fU;
+//	const int32_t iV = (int32_t)fV;
+//	
+//	const float u_ratio    = fU - iU;
+//	const float v_ratio    = fV - iV;
+//	const float u_opposite = 1.0f - u_ratio;
+//	const float v_opposite = 1.0f - v_ratio;
+//	
+//	const RGBA32 c00 = get_color(pImage, Point{ iU,     iV });
+//	const RGBA32 c01 = get_color(pImage, Point{ iU,     iV + 1 });
+//	const RGBA32 c10 = get_color(pImage, Point{ iU + 1, iV });
+//	const RGBA32 c11 = get_color(pImage, Point{ iU + 1, iV + 1 });
+//	
+//	return RGBA32{
+//		(uint8_t)((c00.red   * u_opposite + c10.red   * u_ratio) * v_opposite + (c01.red   * u_opposite + c11.red   * u_ratio) * v_ratio),
+//		(uint8_t)((c00.green * u_opposite + c10.green * u_ratio) * v_opposite + (c01.green * u_opposite + c11.green * u_ratio) * v_ratio),
+//		(uint8_t)((c00.blue  * u_opposite + c10.blue  * u_ratio) * v_opposite + (c01.blue  * u_opposite + c11.blue  * u_ratio) * v_ratio),
+//		(uint8_t)((c00.alpha * u_opposite + c10.alpha * u_ratio) * v_opposite + (c01.alpha * u_opposite + c11.alpha * u_ratio) * v_ratio)
+//	};
+//}
 
 template < typename type_t >
 type_t lerp(type_t a, type_t b, int32_t x)
@@ -751,32 +743,36 @@ void cc0::gfx::stretch_image(cc0::gfx::Image &dst, cc0::gfx::Rect dst_rect, cons
 	const int32_t dsx = ((src_rect.b.x - src_rect.a.x) << 15) / (dst_rect.b.x - dst_rect.a.x);
 	const int32_t dsy = ((src_rect.b.y - src_rect.a.y) << 15) / (dst_rect.b.y - dst_rect.a.y);
 
-	dst_rect.b.x = dst_rect.b.x < dst.width  ? dst_rect.b.x : dst.width;
-	dst_rect.b.y = dst_rect.b.y < dst.height ? dst_rect.b.y : dst.height;
-
-	int32_t ssx = min(src_rect.a.x, src_rect.b.x) << 15;
+	int32_t ssx = dsx >= 0 ? (min(src_rect.a.x, src_rect.b.x) << 15) : ((max(src_rect.a.x, src_rect.b.x) << 15) + dsx);
 	if (dst_rect.a.x < write_rect.a.x) {
-		ssx += dsx * (dst_rect.a.x - write_rect.a.x);
+		if (dsx >= 0) { ssx += dsx * (dst_rect.a.x - write_rect.a.x); }
 		dst_rect.a.x = write_rect.a.x;
 	}
+	if (dst_rect.b.x >= write_rect.b.x) {
+		if (dsx < 0) { ssx += dsx * (write_rect.b.x - dst_rect.b.x); }
+		dst_rect.b.x = write_rect.b.x;
+	}
 
-	int32_t ssy = min(src_rect.a.y, src_rect.b.y) << 15;
+	int32_t ssy = dsy >= 0 ? (min(src_rect.a.y, src_rect.b.y) << 15) : ((max(src_rect.a.y, src_rect.b.y) << 15) + dsy);
 	if (dst_rect.a.y < write_rect.a.y) {
-		ssy += dsy * (dst_rect.a.y - write_rect.a.y);
+		if (dsy >= 0) { ssy += dsy * (dst_rect.a.y - write_rect.a.y); }
 		dst_rect.a.y = write_rect.a.y;
 	}
-	const int32_t esx = (max(src_rect.a.x, src_rect.b.x) << 15) - abs(dsx);
-	const int32_t esy = (max(src_rect.a.y, src_rect.b.y) << 15) - abs(dsy);
-	for (int32_t dy = dst_rect.a.y, sy = 0; dy < dst_rect.b.y; ++dy, sy += abs(dsy)) {
-		for (int32_t dx = dst_rect.a.x, sx = 0; dx < dst_rect.b.x; ++dx, sx += abs(dsx)) {
+	if (dst_rect.b.y >= write_rect.b.y) {
+		if (dsy < 0) { ssy += dsy * (write_rect.b.y - dst_rect.b.y); }
+		dst_rect.b.y = write_rect.b.y;
+	}
+
+	for (int32_t dy = dst_rect.a.y, sy = 0; dy < dst_rect.b.y; ++dy, sy += dsy) {
+		for (int32_t dx = dst_rect.a.x, sx = 0; dx < dst_rect.b.x; ++dx, sx += dsx) {
 			set_color(
 				dst,
 				Point{ dx, dy },
 				get_color(
 					src,
 					Point{
-						(dsx >= 0 ? ssx + sx : esx - sx) >> 15,
-						(dsy >= 0 ? ssy + sy : esy - sy) >> 15
+						(ssx + sx) >> 15,
+						(ssy + sy) >> 15
 					}
 				)
 			);
@@ -784,80 +780,78 @@ void cc0::gfx::stretch_image(cc0::gfx::Image &dst, cc0::gfx::Rect dst_rect, cons
 	}
 }
 
-void cc0::gfx::draw_image(cc0::gfx::Image &pDst, int32_t pDx1, int32_t pDy1, int32_t pDx2, int32_t pDy2, const cc0::gfx::Image &pSrc, cc0::gfx::Shader shader, cc0::gfx::Sampler sampler, int32_t pSx1, int32_t pSy1, int32_t pSx2, int32_t pSy2)
+void cc0::gfx::stretch_image(Image &dst, Rect dst_rect, const Image &src, Shader shader, Sampler sampler, Rect src_rect, Rect write_rect)
 {
-	// clip pSrcRect against max borders
-	pSx1 = 0           > pSx1 ? 0           : pSx1;
-	pSy1 = 0           > pSy1 ? 0           : pSy1;
-	pSx2 = pSrc.width  < pSx2 ? pSrc.width  : pSx2;
-	pSy2 = pSrc.height < pSy2 ? pSrc.height : pSy2;
-	
-	float       u1 = (float)pSx1 / (float)(pSrc.width-1);
-	float       v1 = (float)pSy1 / (float)(pSrc.height-1);
-	float       u2 = (float)pSx2 / (float)(pSrc.width-1);
-	float       v2 = (float)pSy2 / (float)(pSrc.height-1);
-	const float du = (u2 - u1) / (float)(pDx2 - pDx1);
-	const float dv = (v2 - v1) / (float)(pDy2 - pDy1);
-	
-	// enable a negative writable area on pDst (flips blit direction)
-	if (pDx2 < pDx1) {
-		const int32_t itemp = pDx1;
-		pDx1 = pDx2;
-		pDx2 = itemp;
-		float ftemp = u1;
-		u1 = u2;
-		u2 = ftemp;
-		if (pDx1 < 0) { // make read offset for pSrc + clip against min borders
-			u1 = u1 - du * pDx1;
-			pDx1 = 0;
-		}
-	} else if (pDx1 < 0) { // make read offset for pSrc + clip against min borders
-		u1 = u1 + du * -pDx1;
-		pDx1 = 0;
+	// [ ] We probably need to interpolate normalized texture coordinates because bilinear needs to interpolate 0 - width-1, while nearest needs to interpolate 0 - width.
+
+	write_rect = order(write_rect);
+	clamp(0, write_rect.a.x, dst.width);
+	clamp(0, write_rect.b.x, dst.width);
+	clamp(0, write_rect.a.y, dst.height);
+	clamp(0, write_rect.b.y, dst.height);
+
+	if (src_rect.a.x == src_rect.b.x) { return; }
+	if (src_rect.a.y == src_rect.b.y) { return; }
+	if (dst_rect.a.x == dst_rect.b.x) { return; }
+	if (dst_rect.a.y == dst_rect.b.y) { return; }
+
+	clamp(0, src_rect.a.x, src.width);
+	clamp(0, src_rect.b.x, src.width);
+	clamp(0, src_rect.a.y, src.height);
+	clamp(0, src_rect.b.y, src.height);
+
+	if (dst_rect.a.x > dst_rect.b.x) {
+		swap(dst_rect.a.x, dst_rect.b.x);
+		swap(src_rect.a.x, src_rect.b.x);
 	}
-	if (pDy2 < pDy1) {
-		const int32_t itemp = pDy1;
-		pDy1 = pDy2;
-		pDy2 = itemp;
-		float ftemp = v1;
-		v1 = v2;
-		v2 = ftemp;
-		if (pDy1 < 0) { // make read offset for pSrc + clip against min borders
-			v1 = v1 - dv * pDy1;
-			pDy1 = 0;
-		}
-	} else if (pDy1 < 0) { // make read offset for pSrc + clip against min borders
-		v1 = v1 + dv * -pDy1;
-		pDy1 = 0;
+	if (dst_rect.a.y > dst_rect.b.y) {
+		swap(dst_rect.a.y, dst_rect.b.y);
+		swap(src_rect.a.y, src_rect.b.y);
 	}
-	
-	// clip pDstRect against max borders
-	pDx2 = pDst.width  < pDx2 ? pDst.width  : pDx2;
-	pDy2 = pDst.height < pDy2 ? pDst.height : pDy2;
-	
-	// determine writable area
-	const int32_t MAXY = pDy2 - pDy1;
-	const int32_t MAXX = pDx2 - pDx1;
-	if (MAXX < 0 || MAXY < 0) { return; } // readable area is negative (probably because pSrc is offscreen)
-	
-	const int32_t DST_WIDTH = pDst.width;
-	
-	// draw scanlines
-	float v = v1;
-	for (int32_t y = 0; y < MAXY; ++y) {
-		float u = u1;
-		for (int32_t x = 0; x < MAXX; ++x) {
-			const Point p = { x + pDx1, y + pDy1 };
-			set_color(pDst, p, shader(get_color(pDst, p), sampler(pSrc, u, v)));
-			u += du;
+
+	if (dst_rect.b.x < write_rect.a.x || dst_rect.a.x >= write_rect.b.x) { return; }
+	if (dst_rect.b.y < write_rect.a.x || dst_rect.a.y >= write_rect.b.y) { return; }
+
+	const int32_t dsx = ((src_rect.b.x - src_rect.a.x) << 15) / (dst_rect.b.x - dst_rect.a.x);
+	const int32_t dsy = ((src_rect.b.y - src_rect.a.y) << 15) / (dst_rect.b.y - dst_rect.a.y);
+
+	int32_t ssx = dsx >= 0 ? (min(src_rect.a.x, src_rect.b.x) << 15) : ((max(src_rect.a.x, src_rect.b.x) << 15) + dsx);
+	if (dst_rect.a.x < write_rect.a.x) {
+		if (dsx >= 0) { ssx += dsx * (dst_rect.a.x - write_rect.a.x); }
+		dst_rect.a.x = write_rect.a.x;
+	}
+	if (dst_rect.b.x >= write_rect.b.x) {
+		if (dsx < 0) { ssx += dsx * (write_rect.b.x - dst_rect.b.x); }
+		dst_rect.b.x = write_rect.b.x;
+	}
+
+	int32_t ssy = dsy >= 0 ? (min(src_rect.a.y, src_rect.b.y) << 15) : ((max(src_rect.a.y, src_rect.b.y) << 15) + dsy);
+	if (dst_rect.a.y < write_rect.a.y) {
+		if (dsy >= 0) { ssy += dsy * (dst_rect.a.y - write_rect.a.y); }
+		dst_rect.a.y = write_rect.a.y;
+	}
+	if (dst_rect.b.y >= write_rect.b.y) {
+		if (dsy < 0) { ssy += dsy * (write_rect.b.y - dst_rect.b.y); }
+		dst_rect.b.y = write_rect.b.y;
+	}
+
+	for (int32_t dy = dst_rect.a.y, sy = 0; dy < dst_rect.b.y; ++dy, sy += dsy) {
+		for (int32_t dx = dst_rect.a.x, sx = 0; dx < dst_rect.b.x; ++dx, sx += dsx) {
+			set_color(
+				dst,
+				Point{ dx, dy },
+				shader(
+					get_color(dst, Point{ dx, dy }),
+					sampler(src, ssx + sx, ssy + sy)
+				)
+			);
 		}
-		v += dv;
 	}
 }
 
-int32_t cc0::gfx::text(cc0::gfx::Image &dst, cc0::gfx::Point p, const char *text, int32_t text_len, cc0::gfx::RGBA32 color, int32_t scale)
+int32_t cc0::gfx::print_text(cc0::gfx::Image &dst, cc0::gfx::Point p, const char *text, int32_t text_len, cc0::gfx::RGBA32 color, int32_t scale)
 {
-	const Image src = new_image(
+	static const Image src = new_image(
 		FONT_ATLAS,
 		FONT_ATLAS_CHAR_WIDTH_COUNT * FONT_CELL_PX_WIDTH, FONT_ATLAS_CHAR_HEIGHT_COUNT * FONT_CELL_PX_HEIGHT, 0,
 		encode_1bpp, decode_1bpp, index_linear
@@ -865,10 +859,9 @@ int32_t cc0::gfx::text(cc0::gfx::Image &dst, cc0::gfx::Point p, const char *text
 	for (int32_t i = 0; i < text_len && text[i] != 0; ++i, p.x += FONT_CHAR_PX_WIDTH) {
 		if (text[i] != ' ') {
 			const int32_t sy = 0;
-			draw_image(
-				dst, p.x, p.y, p.x + FONT_CELL_PX_WIDTH, p.y + FONT_CELL_PX_HEIGHT,
-				src, shade_stencil, sample_nearest,
-				0, sy, FONT_CELL_PX_WIDTH, sy + FONT_CELL_PX_HEIGHT
+			stretch_image(
+				dst, Rect{ Point{ p.x, p.y }, Point{ p.x + FONT_CELL_PX_WIDTH, p.y + FONT_CELL_PX_HEIGHT } },
+				src, shade_stencil, sample_nearest, Rect{ Point{ 0, sy }, Point{ FONT_CELL_PX_WIDTH, sy + FONT_CELL_PX_HEIGHT } }
 			);
 		}
 	}

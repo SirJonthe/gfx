@@ -22,3 +22,6 @@ g++ -std=c++11 code.cpp gfx/gfx.cpp
 ```
 
 ...where `code.cpp` is an example source file containing some user code as well as the entry point for the program.
+
+## TODO
+- [ ] The stretch_image version using sampling probably needs to interpolate normalized texture coordinates because bilinear needs to interpolate 0 - width-1, while nearest needs to interpolate 0 - width, and the function itself does not know how to differentiate the bounds.
