@@ -505,14 +505,14 @@ cc0::gfx::RGBA32 cc0::gfx::shade_colorkey(cc0::gfx::RGBA32 pDst, cc0::gfx::RGBA3
 	return (((*(uint32_t*)(&pSrc)) & MASK) == KEY) ? pDst : pSrc;
 }
 
-cc0::gfx::RGBA32 cc0::gfx::shade_gray(cc0::gfx::RGBA32, cc0::gfx::RGBA32 pSrc)
+cc0::gfx::RGBA32 cc0::gfx::shade_gray(cc0::gfx::RGBA32, cc0::gfx::RGBA32 src)
 {
-	const uint8_t GRAY = (uint8_t)(
-		(float)pSrc.red   * 0.30f +
-		(float)pSrc.green * 0.59f +
-		(float)pSrc.blue  * 0.11f
-	);
-	return RGBA32{ GRAY, GRAY, GRAY, pSrc.alpha };
+	// r = ~30%, g = ~60%, b = ~10%
+	const uint32_t r = uint32_t(src.red)   * 3;
+	const uint32_t g = uint32_t(src.green) * 6;
+	const uint32_t b = uint32_t(src.blue);
+	const uint8_t  GRAY = (r + g + b) / 10;
+	return RGBA32{ GRAY, GRAY, GRAY, src.alpha };
 }
 
 cc0::gfx::RGBA32 cc0::gfx::shade_grayalpha(cc0::gfx::RGBA32 pDst, cc0::gfx::RGBA32 pSrc)
@@ -846,9 +846,11 @@ void cc0::gfx::stretch_image(Image &dst, Rect dst_rect, const Image &src, Shader
 
 int32_t cc0::gfx::print_text(cc0::gfx::Image &dst, cc0::gfx::Point p, const char *text, int32_t text_len, cc0::gfx::RGBA32 color, int32_t scale)
 {
+	if (scale <= 0) { return p.x; }
+
 	static const Image src = new_image(
 		FONT_ATLAS,
-		FONT_ATLAS_CHAR_WIDTH_COUNT * FONT_CELL_PX_WIDTH, FONT_ATLAS_CHAR_HEIGHT_COUNT * FONT_CELL_PX_HEIGHT, 0,
+		FONT_ATLAS_CHAR_WIDTH_COUNT * FONT_CELL_PX_WIDTH, FONT_ATLAS_CHAR_HEIGHT_COUNT * FONT_CELL_PX_HEIGHT,
 		encode_1bpp, decode_1bpp, index_linear
 	);
 	const int32_t CHAR_DST_WIDTH  = FONT_CHAR_PX_WIDTH * scale;
@@ -856,10 +858,17 @@ int32_t cc0::gfx::print_text(cc0::gfx::Image &dst, cc0::gfx::Point p, const char
 	for (int32_t i = 0; i < text_len && text[i] != 0; ++i, p.x += CHAR_DST_WIDTH) {
 		if (text[i] != ' ') {
 			const int32_t sy = FONT_CELL_PX_HEIGHT * ((int32_t)text[i] - FONT_CHAR_ASCII_START);
-			stretch_image(
-				dst, Rect{ Point{ p.x, p.y }, Point{ p.x + CHAR_DST_WIDTH, p.y + CHAR_DST_HEIGHT } },
-				src, shade_stencil, sample_nearest, Rect{ Point{ 0, sy }, Point{ FONT_CELL_PX_WIDTH, sy + FONT_CELL_PX_HEIGHT } }
-			);
+			if (scale == 1) {
+				blit_image(
+					dst, Point{ p.x, p.y },
+					src, shade_stencil, Rect{ Point{ 0, sy }, Point{ FONT_CELL_PX_WIDTH, sy + FONT_CELL_PX_HEIGHT } }
+				);
+			} else {
+				stretch_image(
+					dst, Rect{ Point{ p.x, p.y }, Point{ p.x + CHAR_DST_WIDTH, p.y + CHAR_DST_HEIGHT } },
+					src, shade_stencil, sample_nearest, Rect{ Point{ 0, sy }, Point{ FONT_CELL_PX_WIDTH, sy + FONT_CELL_PX_HEIGHT } }
+				);
+			}
 		}
 	}
 	return p.x;
