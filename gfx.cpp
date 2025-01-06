@@ -858,17 +858,10 @@ int32_t cc0::gfx::print_text(cc0::gfx::Image &dst, cc0::gfx::Point p, const char
 	for (int32_t i = 0; i < text_len && text[i] != 0; ++i, p.x += CHAR_DST_WIDTH) {
 		if (text[i] != ' ') {
 			const int32_t sy = FONT_CELL_PX_HEIGHT * ((int32_t)text[i] - FONT_CHAR_ASCII_START);
-			if (scale == 1) {
-				blit_image(
-					dst, Point{ p.x, p.y },
-					src, shade_stencil, Rect{ Point{ 0, sy }, Point{ FONT_CELL_PX_WIDTH, sy + FONT_CELL_PX_HEIGHT } }
-				);
-			} else {
-				stretch_image(
-					dst, Rect{ Point{ p.x, p.y }, Point{ p.x + CHAR_DST_WIDTH, p.y + CHAR_DST_HEIGHT } },
-					src, shade_stencil, sample_nearest, Rect{ Point{ 0, sy }, Point{ FONT_CELL_PX_WIDTH, sy + FONT_CELL_PX_HEIGHT } }
-				);
-			}
+			stretch_image(
+				dst, Rect{ Point{ p.x, p.y }, Point{ p.x + CHAR_DST_WIDTH, p.y + CHAR_DST_HEIGHT } },
+				src, shade_stencil, sample_nearest, Rect{ Point{ 0, sy }, Point{ FONT_CELL_PX_WIDTH, sy + FONT_CELL_PX_HEIGHT } }
+			);
 		}
 	}
 	return p.x;
