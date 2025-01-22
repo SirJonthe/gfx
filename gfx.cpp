@@ -747,21 +747,19 @@ void cc0::gfx::stretch_image(cc0::gfx::Image &dst, cc0::gfx::Rect dst_rect, cons
 
 	int32_t ssx = dsx >= 0 ? (min(src_rect.a.x, src_rect.b.x) << 15) : ((max(src_rect.a.x, src_rect.b.x) << 15) + dsx);
 	if (dst_rect.a.x < write_rect.a.x) {
-		if (dsx >= 0) { ssx += dsx * (dst_rect.a.x - write_rect.a.x); }
+		ssx += dsx * (write_rect.a.x - dst_rect.a.x);
 		dst_rect.a.x = write_rect.a.x;
 	}
 	if (dst_rect.b.x >= write_rect.b.x) {
-		if (dsx < 0) { ssx += dsx * (write_rect.b.x - dst_rect.b.x); }
 		dst_rect.b.x = write_rect.b.x;
 	}
 
 	int32_t ssy = dsy >= 0 ? (min(src_rect.a.y, src_rect.b.y) << 15) : ((max(src_rect.a.y, src_rect.b.y) << 15) + dsy);
 	if (dst_rect.a.y < write_rect.a.y) {
-		if (dsy >= 0) { ssy += dsy * (dst_rect.a.y - write_rect.a.y); }
+		ssy += dsy * (write_rect.a.y - dst_rect.a.y);
 		dst_rect.a.y = write_rect.a.y;
 	}
 	if (dst_rect.b.y >= write_rect.b.y) {
-		if (dsy < 0) { ssy += dsy * (write_rect.b.y - dst_rect.b.y); }
 		dst_rect.b.y = write_rect.b.y;
 	}
 
