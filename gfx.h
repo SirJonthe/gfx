@@ -18,15 +18,15 @@ namespace cc0
 			uint8_t alpha; // The alpha component.
 		};
 
-		static const RGBA32 COLOR_WHITE   = { 255, 255, 255, 255 };
-		static const RGBA32 COLOR_BLACK   = { 0, 0, 0, 255 };
-		static const RGBA32 COLOR_RED     = { 255, 0, 0, 255 };
-		static const RGBA32 COLOR_GREEN   = { 0, 255, 0, 255 };
-		static const RGBA32 COLOR_BLUE    = { 0, 0, 255, 255 };
-		static const RGBA32 COLOR_MAGENTA = { 255, 0, 255, 255 };
-		static const RGBA32 COLOR_CYAN    = { 0, 255, 255, 255 };
-		static const RGBA32 COLOR_YELLOW  = { 255, 255, 0, 255 };
-		static const RGBA32 COLOR_GRAY    = { 127, 127, 127, 255 };
+		static const RGBA32 COLOR_WHITE   = { 255, 255, 255, 255 }; // White.
+		static const RGBA32 COLOR_BLACK   = { 0, 0, 0, 255 };       // Black.
+		static const RGBA32 COLOR_RED     = { 255, 0, 0, 255 };     // Red.
+		static const RGBA32 COLOR_GREEN   = { 0, 255, 0, 255 };     // Green.
+		static const RGBA32 COLOR_BLUE    = { 0, 0, 255, 255 };     // Blue.
+		static const RGBA32 COLOR_MAGENTA = { 255, 0, 255, 255 };   // Magenta.
+		static const RGBA32 COLOR_CYAN    = { 0, 255, 255, 255 };   // Cyan.
+		static const RGBA32 COLOR_YELLOW  = { 255, 255, 0, 255 };   // Yellow.
+		static const RGBA32 COLOR_GRAY    = { 127, 127, 127, 255 }; // Gray.
 
 		/// @brief A point.
 		struct Point
@@ -40,6 +40,13 @@ namespace cc0
 		{
 			Point a; // A point.
 			Point b; // The diagonally adjacent point.
+		};
+
+		/// @brief A span.
+		struct Span
+		{
+			int32_t a; // An endpoint on the span.
+			int32_t b; // An endpoint on the span.
 		};
 
 		struct Image;
@@ -383,7 +390,7 @@ namespace cc0
 		/// @return The final sampled color.
 		RGBA32 sample_bilinear(const Image &src, int32_t u, int32_t v);
 
-		/// @brief An image container. The container is mostly a convenience, and does not own its own memory, and is unaware how to decode and encode pixels as well as how to index tbe pixel data given 2D coordinates.
+		/// @brief An image container. The container is mostly a convenience, does not own its own memory, and is unaware how to decode and encode pixels as well as how to index tbe pixel data given 2D coordinates.
 		struct Image
 		{
 			uint8_t *pixels; // A pixel array containing the color information of the image. May also contain other types of data (such as RLE header) as long as the encoder, decoder, and indexer can traverse the data.
@@ -418,13 +425,17 @@ namespace cc0
 		/// @param c The color.
 		void set_color(Image &dst, Point p, RGBA32 c);
 
-		/// @brief Fills the specified area with the specified color using the specified predicate (normal assignment is default).
+		const Rect FULL_RECT = Rect{ Point{0,0}, Point{Image::MAX_DIMENSION, Image::MAX_DIMENSION} }; // The maximum (unsigned) rectangle allowed. Can often be used to indicate the maximally allowed region of an image.
+
+		const Span FULL_SPAN = Span{ 0, Image::MAX_DIMENSION }; // The maximum (unsigned) span allowed. Can often be used to indicate the maximally allowed region of an image.
+
+		/// @brief Fills the specified area with the specified color using the specified shader (normal assignment is default).
 		/// @param dst The destination image.
 		/// @param dst_rect The region to fill.
 		/// @param color The input color.
 		/// @param shader The shader to use to blend colors.
 		/// @param write_rect The area on the destination image that is writeable. All rendering outside this area is discarded. The entire destination image is selected by default. The region is automatically clipped to the maximally allowed dimensions on the destination image.
-		void fill_rect(Image &dst, Rect dst_rect, RGBA32 color, Shader shader = shade_set, Rect write_rect = Rect{ Point{ 0, 0 }, Point{ Image::MAX_DIMENSION, Image::MAX_DIMENSION } });
+		void fill_rect(Image &dst, Rect dst_rect, RGBA32 color, Shader shader = shade_set, Rect write_rect = FULL_RECT);
 
 		/// @brief Draws a line between the two specified points using the two specified colors and the specified predicate (normal assignment is default).
 		/// @param pDst The destination image.
@@ -443,7 +454,7 @@ namespace cc0
 		/// @param src The source image.
 		/// @param src_rect The area on the source image to stretch over the selected destination region. The entire source image is selected by default. The region is automatically clipped to the maximally allowed dimensions on the source image.
 		/// @param write_rect The area on the destination image that is writeable. All rendering outside this area is discarded. The entire destination image is selected by default. The region is automatically clipped to the maximally allowed dimensions on the destination image.
-		void stretch_image(Image &dst, Rect dst_rect, const Image &src, Rect src_rect = Rect{ Point{ 0, 0 }, Point{ Image::MAX_DIMENSION, Image::MAX_DIMENSION } }, Rect write_rect = Rect{ Point{ 0, 0 }, Point{ Image::MAX_DIMENSION, Image::MAX_DIMENSION } });
+		void stretch_image(Image &dst, Rect dst_rect, const Image &src, Rect src_rect = FULL_RECT, Rect write_rect = FULL_RECT);
 
 		/// @brief Stretches a portion of a source image over the portion of a destination image.
 		/// @param dst The destination image.
@@ -453,7 +464,28 @@ namespace cc0
 		/// @param sampler The sampler to use on the source image to sample colors.
 		/// @param src_rect The area on the source image to stretch over the selected destination region. The entire source image is selected by default. The region is automatically clipped to the maximally allowed dimensions on the source image.
 		/// @param write_rect The area on the destination image that is writeable. All rendering outside this area is discarded. The entire destination image is selected by default. The region is automatically clipped to the maximally allowed dimensions on the destination image.
-		void stretch_image(Image &dst, Rect dst_rect, const Image &src, Shader shader, Sampler sampler, Rect src_rect = Rect{ Point{ 0, 0 }, Point{ Image::MAX_DIMENSION, Image::MAX_DIMENSION } }, Rect write_rect = Rect{ Point{ 0, 0 }, Point{ Image::MAX_DIMENSION, Image::MAX_DIMENSION } });
+		void stretch_image(Image &dst, Rect dst_rect, const Image &src, Shader shader, Sampler sampler, Rect src_rect = FULL_RECT, Rect write_rect = FULL_RECT);
+
+		/// @brief Draws a vertical span on the destination image.
+		/// @param dst The destination image.
+		/// @param dst_x The X coordinate of the span.
+		/// @param dst_span The Y span.
+		/// @param color The color.
+		/// @param shader The shader to use to blend colors (defaults to assignment).
+		/// @param write_rect The area on the destination image that is writeable. All rendering outside this area is discarded. The entire destination image is selected by default. The region is automatically clipped to the maximally allowed dimensions on the destination image.
+		void fill_span(Image &dst, int32_t dst_x, Span dst_span, RGBA32 color, Shader shader = shade_set, Rect write_rect = FULL_RECT);
+
+		/// @brief Draws a vertical span on the destination image by stretching a region of the source image over a region of the destination image.
+		/// @param dst The destination image.
+		/// @param dst_x The X coordinate to sample the span from on the destination image.
+		/// @param dst_span The span of the destination image.
+		/// @param src The source image.
+		/// @param src_x The X coordinate to sample the span from on the destination image.
+		/// @param src_span The span of the source image to stretch over the span on the destination image.
+		/// @param shader The shader to use.
+		/// @param sampler The sampler to use on the source image.
+		/// @param write_rect The area on the destination image that is writeable. All rendering outside this area is discarded. The entire destination image is selected by default. The region is automatically clipped to the maximally allowed dimensions on the destination image.
+		void stretch_span(Image &dst, int32_t dst_x, Span dst_span, const Image &src, Shader shader, Sampler sampler, int32_t src_x, Span src_span = FULL_SPAN, Rect write_rect = FULL_RECT);
 
 		/// @brief Draws text using the built-in font on the 
 		/// @param dst The target image.
@@ -463,12 +495,25 @@ namespace cc0
 		/// @param text_len The number of characters in the text.
 		/// @param color The color to render the text in.
 		/// @param scale The scale of the text.
+		/// @param write_rect The area on the destination image that is writeable. All rendering outside this area is discarded. The entire destination image is selected by default. The region is automatically clipped to the maximally allowed dimensions on the destination image.
 		/// @return The X coordinate past the last character of the input string.
 		/// @note This uses only a built-in font, but the effect can be replicated using any bitfont using the draw_image function and the 1bpp encoder/decoder functions.
-		int32_t print_text(Image &dst, Point p, const char *text, int32_t text_len, RGBA32 color, int32_t scale = 1);
+		int32_t print_text(Image &dst, Point p, const char *text, int32_t text_len, RGBA32 color, int32_t scale = 1, Rect write_rect = FULL_RECT);
 
 		// [ ] draw_triangle
-		// [ ] draw a single vertical line (textued, untextured, color interpolated)
+		//	[ ] void shade_triangle(); // barycentric interpolation but no texture
+		//	[ ] void texture_triangle(); // texture only
+		//	[ ] void draw_triangle(); // the whole shebang
+
+		/// @brief Fills the specified triangle area with the specified color using the specified shader (normal assignment is default).
+		/// @param dst The destination image.
+		/// @param a A point of the triangle.
+		/// @param b A point of the triangle.
+		/// @param c A point of the triangle/
+		/// @param color The input color.
+		/// @param shader The shader to use to blend colors (assignment is default).
+		/// @param write_rect The area on the destination image that is writeable. All rendering outside this area is discarded. The entire destination image is selected by default. The region is automatically clipped to the maximally allowed dimensions on the destination image.
+		void fill_tri(Image &dst, Point a, Point b, Point c, RGBA32 color, Shader shader = shade_set, Rect write_rect = FULL_RECT);
 	}
 }
 

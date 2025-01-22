@@ -91,9 +91,21 @@ type_t min(type_t a, type_t b)
 }
 
 template < typename type_t >
+type_t min(type_t a, type_t b, type_t c)
+{
+	return min(a, min(b, c));
+}
+
+template < typename type_t >
 type_t max(type_t a, type_t b)
 {
 	return a > b ? a : b;
+}
+
+template < typename type_t >
+type_t max(type_t a, type_t b, type_t c)
+{
+	return max(a, max(b, c));
 }
 
 template < typename type_t >
@@ -115,6 +127,17 @@ cc0::gfx::Rect clip(cc0::gfx::Rect a, cc0::gfx::Rect b)
 		cc0::gfx::Point{ max(a.a.x, b.a.x), max(a.a.y, b.a.y) },
 		cc0::gfx::Point{ min(a.b.x, b.b.x), min(a.b.y, b.b.y) }
 	};
+}
+
+uint64_t determine_halfspace(cc0::gfx::Point a, cc0::gfx::Point b, cc0::gfx::Point point)
+{
+	return uint64_t(b.x - a.x) * uint64_t(point.y - a.y) - uint64_t(b.y - a.y) * uint64_t(point.x - a.x);
+}
+
+bool is_top_left(cc0::gfx::Point a, cc0::gfx::Point b)
+{
+	// strictly connected to winding order
+	return (a.x < b.x && b.y == a.y) || (a.y > b.y);
 }
 
 int32_t cc0::gfx::index_linear(const cc0::gfx::Image &src, cc0::gfx::Point p)
@@ -836,7 +859,48 @@ void cc0::gfx::stretch_image(Image &dst, Rect dst_rect, const Image &src, Shader
 	}
 }
 
-int32_t cc0::gfx::print_text(cc0::gfx::Image &dst, cc0::gfx::Point p, const char *text, int32_t text_len, cc0::gfx::RGBA32 color, int32_t scale)
+void cc0::gfx::fill_span(cc0::gfx::Image &dst, int32_t dst_x, cc0::gfx::Span dst_span, cc0::gfx::RGBA32 color, cc0::gfx::Shader shader, cc0::gfx::Rect write_rect)
+{
+	write_rect = clip(order(write_rect), Rect{ Point{ 0, 0 }, Point{ dst.width, dst.height } });
+
+	if (dst_x < write_rect.a.x || dst_x >= write_rect.b.x) { return; }
+
+	if (dst_span.a > dst_span.b) { swap(dst_span.a, dst_span.b); }
+	dst_span.a = max(dst_span.a, write_rect.a.y);
+	dst_span.b = min(dst_span.b, write_rect.b.y);
+
+	for (int32_t y = dst_span.a; y < dst_span.b; ++y) {
+		set_color(dst, Point{ dst_x, y }, shader(get_color(dst, Point{ dst_x, y }), color));
+	}
+}
+
+void cc0::gfx::stretch_span(cc0::gfx::Image &dst, int32_t dst_x, cc0::gfx::Span dst_span, const cc0::gfx::Image &src, cc0::gfx::Shader shader, cc0::gfx::Sampler sampler, int32_t src_x, cc0::gfx::Span src_span, cc0::gfx::Rect write_rect)
+{
+	write_rect = clip(order(write_rect), Rect{ Point{ 0, 0 }, Point{ dst.width, dst.height } });
+
+	if (dst_x < write_rect.a.x || dst_x >= write_rect.b.x) { return; }
+
+	if (dst_span.a > dst_span.b) {
+		swap(dst_span.a, dst_span.b);
+		swap(src_span.a, src_span.b);
+	}
+
+	const int32_t dss = ((src_span.b - src_span.a) << 15) / (dst_span.b - dst_span.a);
+	int32_t src_y = src_span.a << 15;
+	src_x <<= 15;
+
+	if (dst_span.a < write_rect.a.y) {
+		src_y += dss * (write_rect.a.y - dst_span.a);
+		dst_span.a = write_rect.a.y;
+	}
+	dst_span.b = min(dst_span.b, write_rect.b.y);
+
+	for (int32_t y = dst_span.a; y < dst_span.b; ++y, src_y += dss) {
+		set_color(dst, Point{ dst_x, y }, shader(get_color(dst, Point{ dst_x, y }), sampler(src, src_x, src_y)));
+	}
+}
+
+int32_t cc0::gfx::print_text(cc0::gfx::Image &dst, cc0::gfx::Point p, const char *text, int32_t text_len, cc0::gfx::RGBA32 color, int32_t scale, cc0::gfx::Rect write_rect)
 {
 	if (scale <= 0) { return p.x; }
 
@@ -847,14 +911,190 @@ int32_t cc0::gfx::print_text(cc0::gfx::Image &dst, cc0::gfx::Point p, const char
 	);
 	const int32_t CHAR_DST_WIDTH  = FONT_CHAR_PX_WIDTH * scale;
 	const int32_t CHAR_DST_HEIGHT = FONT_CHAR_PX_HEIGHT * scale;
-	for (int32_t i = 0; i < text_len && text[i] != 0; ++i, p.x += CHAR_DST_WIDTH) {
+	for (int32_t i = 0; i < text_len && text[i] != 0 && p.x < write_rect.b.x; ++i, p.x += CHAR_DST_WIDTH) {
 		if (text[i] != ' ') {
 			const int32_t sy = FONT_CELL_PX_HEIGHT * ((int32_t)text[i] - FONT_CHAR_ASCII_START);
 			stretch_image(
 				dst, Rect{ Point{ p.x, p.y }, Point{ p.x + CHAR_DST_WIDTH, p.y + CHAR_DST_HEIGHT } },
-				src, shade_stencil, sample_nearest, Rect{ Point{ 0, sy }, Point{ FONT_CELL_PX_WIDTH, sy + FONT_CELL_PX_HEIGHT } }
+				src, shade_stencil, sample_nearest, Rect{ Point{ 0, sy }, Point{ FONT_CELL_PX_WIDTH, sy + FONT_CELL_PX_HEIGHT } },
+				write_rect
 			);
 		}
 	}
 	return p.x;
+}
+
+/*void internal_impl::DrawTriangle(tiny3d::Image &dst, const tiny3d::Array<float> *zread, tiny3d::Array<float> *zwrite, const internal_impl::IVertex &a, const internal_impl::IVertex &b, const internal_impl::IVertex &c, const tiny3d::Texture *tex, const tiny3d::URect *dst_rect)
+{
+	// AABB Clipping
+	int32_t min_y = tiny3d::Max(tiny3d::Min(a.p.y, b.p.y, c.p.y), int32_t(0));
+	int32_t max_y = tiny3d::Min(tiny3d::Max(a.p.y, b.p.y, c.p.y), int32_t(dst.GetHeight() - 1));
+	if (max_y - min_y <= 0) { return; }
+	int32_t min_x = tiny3d::Max(tiny3d::Min(a.p.x, b.p.x, c.p.x), int32_t(0));
+	int32_t max_x = tiny3d::Min(tiny3d::Max(a.p.x, b.p.x, c.p.x), int32_t(dst.GetWidth() - 1));
+	if (max_x - min_x <= 0) { return; }
+
+	if (dst_rect != nullptr) {
+		min_y = int32_t(tiny3d::Max(uint32_t(min_y), dst_rect->a.y));
+		max_y = int32_t(tiny3d::Min(uint32_t(max_y), dst_rect->b.y - 1));
+		min_x = int32_t(tiny3d::Max(uint32_t(min_x), dst_rect->a.x));
+		max_x = int32_t(tiny3d::Min(uint32_t(max_x), dst_rect->b.x - 1));
+	}
+
+	// Triangle setup
+	Point p    = { min_x, min_y };
+	int64_t         w0_y = DetermineHalfspace(b.p, c.p, p);
+	int64_t         w1_y = DetermineHalfspace(c.p, a.p, p);
+	int64_t         w2_y = DetermineHalfspace(a.p, b.p, p);
+
+//	if (ShouldDivide(w0_y + w1_y + w2_y)) {
+//		DrawSubdivTri(dst, zbuf, a, b, c, tex, dst_rect);
+//		return;
+//	}
+
+	// Interpolation/triangle setup
+	const int32_t w2_x_inc        = a.p.y - b.p.y;
+	const int32_t w2_y_inc        = b.p.x - a.p.x;
+	const int32_t w0_x_inc        = b.p.y - c.p.y;
+	const int32_t w0_y_inc        = c.p.x - b.p.x;
+	const int32_t w1_x_inc        = c.p.y - a.p.y;
+	const int32_t w1_y_inc        = a.p.x - c.p.x;
+	const float sum_inv_area_x2 = 1.0f / int32_t(w0_y + w1_y + w2_y);
+	float l0_y           = int32_t(w0_y) * sum_inv_area_x2;
+	float l1_y           = int32_t(w1_y) * sum_inv_area_x2;
+	float l2_y           = int32_t(w2_y) * sum_inv_area_x2;
+	const float l0_x_inc = w0_x_inc * sum_inv_area_x2;
+	const float l1_x_inc = w1_x_inc * sum_inv_area_x2;
+	const float l2_x_inc = w2_x_inc * sum_inv_area_x2;
+	const float l0_y_inc = w0_y_inc * sum_inv_area_x2;
+	const float l1_y_inc = w1_y_inc * sum_inv_area_x2;
+	const float l2_y_inc = w2_y_inc * sum_inv_area_x2;
+
+	w0_y += IsTopLeft(b.p, c.p) ? 0 : -1; // add offsets to coordinates to enforce fill convention
+	w1_y += IsTopLeft(c.p, a.p) ? 0 : -1;
+	w2_y += IsTopLeft(a.p, b.p) ? 0 : -1;
+
+	for (p.y = min_y; p.y <= max_y; ++p.y) {
+
+		int32_t w0 = int32_t(w0_y);
+		int32_t w1 = int32_t(w1_y);
+		int32_t w2 = int32_t(w2_y);
+
+		float l0 = l0_y;
+		float l1 = l1_y;
+		float l2 = l2_y;
+
+		for (p.x = min_x; p.x <= max_x; ++p.x) {
+
+			if ((w0 | w1 | w2) >= 0) {
+
+				const UPoint q     = { uint32_t(p.x), uint32_t(p.y) };
+				const Color  pixel = dst.GetColor(q);
+				const uint32_t   zi    = q.x + q.y * dst.GetWidth();
+				const float  sz    = 1.0f / (a.w * l0 + b.w * l1 + c.w * l2);
+				const float  dz    = (zread != nullptr) ? (*zread)[zi] : std::numeric_limits<float>::infinity();
+
+				if (sz <= dz && pixel.blend != Color::Transparent) { // use transparency bit as a 1-bit stencil
+
+					const float L0 = l0 * sz;
+					const float L1 = l1 * sz;
+					const float L2 = l2 * sz;
+
+					const Color col = {
+						Byte(a.r * L0 + b.r * L1 + c.r * L2),
+						Byte(a.g * L0 + b.g * L1 + c.g * L2),
+						Byte(a.b * L0 + b.b * L1 + c.b * L2),
+						Color::Solid
+					};
+
+					const Color texel = (tex != nullptr) ? tex->GetColor(UPoint{ uint32_t(a.u * L0 + b.u * L1 + c.u * L2), uint32_t(a.v * L0 + b.v * L1 + c.v * L2) }) : Color{ 255, 255, 255, Color::Solid };
+//					const Color texel = (tex != nullptr) ? tex->GetColor(Dither2x2(Vector2{ a.u * L0 + b.u * L1 + c.u * L2, a.v * L0 + b.v * L1 + c.v * L2}, q)) : Color{ 255, 255, 255, Color::Solid }; // Dithered texture filtering (can look good if texture is relatively high resolution)
+
+					switch (texel.blend)
+					{
+					case Color::Solid:
+						dst.SetColor(q, Dither2x2(texel * col, q));
+						if (zwrite != nullptr) { (*zwrite)[zi] = sz; }
+						break;
+					case Color::AddAlpha:
+						dst.SetColor(q, Dither2x2(pixel + texel * col, q));
+						break;
+					case Color::Emissive:
+						dst.SetColor(q, texel);
+						if (zwrite != nullptr) { (*zwrite)[zi] = sz; }
+						break;
+					case Color::EmissiveAddAlpha:
+						dst.SetColor(q, Dither2x2(pixel + texel, q));
+						break;
+					default: break;
+					}
+				}
+			}
+
+			w0 += w0_x_inc;
+			w1 += w1_x_inc;
+			w2 += w2_x_inc;
+
+			l0 += l0_x_inc;
+			l1 += l1_x_inc;
+			l2 += l2_x_inc;
+		}
+
+		w0_y += w0_y_inc;
+		w1_y += w1_y_inc;
+		w2_y += w2_y_inc;
+
+		l0_y += l0_y_inc;
+		l1_y += l1_y_inc;
+		l2_y += l2_y_inc;
+	}
+}*/
+
+void cc0::gfx::fill_tri(cc0::gfx::Image &dst, cc0::gfx::Point a, cc0::gfx::Point b, cc0::gfx::Point c, cc0::gfx::RGBA32 color, cc0::gfx::Shader shader, cc0::gfx::Rect write_rect)
+{
+	write_rect = clip(order(write_rect), Rect{ Point{ 0, 0 }, Point{ dst.width, dst.height } });
+
+	// AABB Clipping
+	const int32_t min_y = max(min(a.y, b.y, c.y), write_rect.a.y);
+	const int32_t max_y = min(max(a.y, b.y, c.y), write_rect.b.y - 1);
+	if (max_y - min_y <= 0) { return; }
+	const int32_t min_x = max(min(a.x, b.x, c.x), write_rect.a.x);
+	const int32_t max_x = min(max(a.x, b.x, c.x), write_rect.b.x - 1);
+	if (max_x - min_x <= 0) { return; }
+
+	// Triangle setup
+	Point   p    = { min_x, min_y };
+	int64_t w0_y = determine_halfspace(b, c, p) + (int64_t(is_top_left(b, c)) - 1);
+	int64_t w1_y = determine_halfspace(c, a, p) + (int64_t(is_top_left(c, a)) - 1);
+	int64_t w2_y = determine_halfspace(a, b, p) + (int64_t(is_top_left(a, b)) - 1);
+
+	// Interpolation/triangle setup
+	const int32_t w2_x_inc = a.y - b.y;
+	const int32_t w2_y_inc = b.x - a.x;
+	const int32_t w0_x_inc = b.y - c.y;
+	const int32_t w0_y_inc = c.x - b.x;
+	const int32_t w1_x_inc = c.y - a.y;
+	const int32_t w1_y_inc = a.x - c.x;
+
+	for (p.y = min_y; p.y <= max_y; ++p.y) {
+
+		int32_t w0 = int32_t(w0_y);
+		int32_t w1 = int32_t(w1_y);
+		int32_t w2 = int32_t(w2_y);
+
+		for (p.x = min_x; p.x <= max_x; ++p.x) {
+
+			if ((w0 | w1 | w2) >= 0) {
+				set_color(dst, p, shader(get_color(dst, p), color));
+			}
+
+			w0 += w0_x_inc;
+			w1 += w1_x_inc;
+			w2 += w2_x_inc;
+		}
+
+		w0_y += w0_y_inc;
+		w1_y += w1_y_inc;
+		w2_y += w2_y_inc;
+	}
 }
