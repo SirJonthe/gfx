@@ -717,10 +717,6 @@ void cc0::gfx::draw_line(cc0::gfx::Image &pDst, int32_t pX1, int32_t pY1, cc0::g
 
 void cc0::gfx::stretch_image(cc0::gfx::Image &dst, cc0::gfx::Rect dst_rect, const cc0::gfx::Image &src, cc0::gfx::Rect src_rect, cc0::gfx::Rect write_rect)
 {
-	// [ ] we need to test:
-	//	[ ] moving dst_rect off-screen in all orientations
-	//	[ ] ensure write_rect works
-
 	write_rect = clip(order(write_rect), Rect{ Point{ 0, 0 }, Point{ dst.width, dst.height } });
 
 	if (src_rect.a.x == src_rect.b.x) { return; }
@@ -810,21 +806,19 @@ void cc0::gfx::stretch_image(Image &dst, Rect dst_rect, const Image &src, Shader
 
 	int32_t ssx = dsx >= 0 ? (min(src_rect.a.x, src_rect.b.x) << 15) : ((max(src_rect.a.x, src_rect.b.x) << 15) + dsx);
 	if (dst_rect.a.x < write_rect.a.x) {
-		if (dsx >= 0) { ssx += dsx * (dst_rect.a.x - write_rect.a.x); }
+		ssx += dsx * (write_rect.a.x - dst_rect.a.x);
 		dst_rect.a.x = write_rect.a.x;
 	}
 	if (dst_rect.b.x >= write_rect.b.x) {
-		if (dsx < 0) { ssx += dsx * (write_rect.b.x - dst_rect.b.x); }
 		dst_rect.b.x = write_rect.b.x;
 	}
 
 	int32_t ssy = dsy >= 0 ? (min(src_rect.a.y, src_rect.b.y) << 15) : ((max(src_rect.a.y, src_rect.b.y) << 15) + dsy);
 	if (dst_rect.a.y < write_rect.a.y) {
-		if (dsy >= 0) { ssy += dsy * (dst_rect.a.y - write_rect.a.y); }
+		ssy += dsy * (write_rect.a.y - dst_rect.a.y);
 		dst_rect.a.y = write_rect.a.y;
 	}
 	if (dst_rect.b.y >= write_rect.b.y) {
-		if (dsy < 0) { ssy += dsy * (write_rect.b.y - dst_rect.b.y); }
 		dst_rect.b.y = write_rect.b.y;
 	}
 
