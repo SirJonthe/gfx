@@ -487,13 +487,13 @@ cc0::gfx::RGBA32 cc0::gfx::shade_set(cc0::gfx::RGBA32, cc0::gfx::RGBA32 src)
 	return src;
 }
 
-cc0::gfx::RGBA32 cc0::gfx::shade_alpha(cc0::gfx::RGBA32 pDst, cc0::gfx::RGBA32 pSrc)
+cc0::gfx::RGBA32 cc0::gfx::shade_alpha(cc0::gfx::RGBA32 dst, cc0::gfx::RGBA32 src)
 {
-	pDst.red   += (pSrc.alpha * (pSrc.red   - pDst.red)   >> CHAR_BIT);
-	pDst.green += (pSrc.alpha * (pSrc.green - pDst.green) >> CHAR_BIT);
-	pDst.blue  += (pSrc.alpha * (pSrc.blue  - pDst.blue)  >> CHAR_BIT);
-	pDst.alpha += (pSrc.alpha * (pSrc.alpha - pDst.alpha) >> CHAR_BIT);
-	return pDst;
+	dst.red   += (src.alpha * (src.red   - dst.red))   >> CHAR_BIT;
+	dst.green += (src.alpha * (src.green - dst.green)) >> CHAR_BIT;
+	dst.blue  += (src.alpha * (src.blue  - dst.blue))  >> CHAR_BIT;
+	dst.alpha += (src.alpha * (src.alpha - dst.alpha)) >> CHAR_BIT;
+	return dst;
 }
 
 cc0::gfx::RGBA32 cc0::gfx::shade_colorkey(cc0::gfx::RGBA32 pDst, cc0::gfx::RGBA32 pSrc)
