@@ -9,6 +9,75 @@ namespace cc0
 {
 	namespace gfx
 	{
+		/// @brief Namespace for internal functions. Do not use these.
+		namespace internal
+		{
+			template < uint32_t bits > struct intinfo {};
+
+			template <>
+			struct intinfo<8>
+			{
+				typedef int8_t      int_t;
+				typedef uint8_t     uint_t;
+				typedef intinfo<8>  prev;
+				typedef intinfo<16> next;
+			};
+
+			template <>
+			struct intinfo<16>
+			{
+				typedef int16_t     int_t;
+				typedef uint16_t    uint_t;
+				typedef intinfo<8>  prev;
+				typedef intinfo<32> next;
+			};
+
+			template <>
+			struct intinfo<32>
+			{
+				typedef int32_t     int_t;
+				typedef uint32_t    uint_t;
+				typedef intinfo<16> prev;
+				typedef intinfo<64> next;
+			};
+
+			template <>
+			struct intinfo<64>
+			{
+				typedef int64_t     int_t;
+				typedef uint64_t    uint_t;
+				typedef intinfo<32> prev;
+				typedef intinfo<64> next;
+			};
+		}
+
+		template < uint32_t bits, uint32_t precision >
+		struct fixed
+		{
+			typename internal::intinfo<bits>::int_t x;
+
+			fixed() = default;
+			fixed(const fixed&) = default;
+			fixed &operator=(const fixed&) = default;
+
+			fixed(typename internal::intinfo<bits>::int_t n) : x(n << precision) {}
+			operator typename internal::intinfo<bits>::int_t( void ) { return x >> precision; }
+
+			fixed &operator+=(fixed r) { x += r.x; return *this; }
+			fixed &operator-=(fixed r) { x -= r.x; return *this; }
+			fixed &operator*=(fixed r) {
+				typename internal::intinfo<bits>::next::int_t n = typename internal::intinfo<bits>::next::int_t(x) * r.x;
+				x = (n.x >> precision);
+				return *this;
+			}
+			fixed &operator/=(fixed r) {
+				x = (typename internal::intinfo<bits>::next::int_t(x) << precision) / r.x;
+				return *this;
+			}
+		};
+
+		typedef fixed<32,15> fixed32_t;
+
 		/// @brief Color separated as channels.
 		struct RGBA32
 		{
@@ -28,11 +97,18 @@ namespace cc0
 		static const RGBA32 COLOR_YELLOW  = { 255, 255, 0, 255 };   // Yellow.
 		static const RGBA32 COLOR_GRAY    = { 127, 127, 127, 255 }; // Gray.
 
-		/// @brief A point.
+		/// @brief A point with integer coordinates.
 		struct Point
 		{
 			int32_t x; // The X coordinate.
 			int32_t y; // The Y coordinate.
+		};
+
+		/// @brief A point with real coordinates.
+		struct Coord
+		{
+			fixed32_t x; // The X coordinate.
+			fixed32_t y; // The Y coordinate.
 		};
 
 		/// @brief A rectangle.
@@ -45,10 +121,18 @@ namespace cc0
 		/// @brief A span.
 		struct Span
 		{
-			int32_t a; // An endpoint on the span.
-			int32_t b; // An endpoint on the span.
+			int32_t a;    // An endpoint on the span.
+			int32_t b;    // An endpoint on the span.
+			int32_t axis; // The axis. 0 for X, 1 for Y.
 		};
 
+		/// @brief A line.
+		struct Line
+		{
+			Coord a; // An endpoint on the line.
+			Coord b; // An endpoint on the line.
+		};
+		
 		struct Image;
 
 		/// @brief Maps a 2D coordinate to a 1D pixel coordinate.
@@ -466,26 +550,38 @@ namespace cc0
 		/// @param write_rect The area on the destination image that is writeable. All rendering outside this area is discarded. The entire destination image is selected by default. The region is automatically clipped to the maximally allowed dimensions on the destination image.
 		void stretch_image(Image &dst, Rect dst_rect, const Image &src, Shader shader, Sampler sampler, Rect src_rect = FULL_RECT, Rect write_rect = FULL_RECT);
 
-		/// @brief Draws a vertical span on the destination image.
+		/// @brief Draws an axis-aligned span on the destination image.
 		/// @param dst The destination image.
-		/// @param dst_x The X coordinate of the span.
-		/// @param dst_span The Y span.
+		/// @param dst_axis The fixed axis of the span. The axis is determined by the inverse of the destination span settings.
+		/// @param dst_span The span of the destination image. The axis is determined by the span settings.
 		/// @param color The color.
 		/// @param shader The shader to use to blend colors (defaults to assignment).
 		/// @param write_rect The area on the destination image that is writeable. All rendering outside this area is discarded. The entire destination image is selected by default. The region is automatically clipped to the maximally allowed dimensions on the destination image.
-		void fill_span(Image &dst, int32_t dst_x, Span dst_span, RGBA32 color, Shader shader = shade_set, Rect write_rect = FULL_RECT);
+		void fill_span(Image &dst, int32_t dst_axis, Span dst_span, RGBA32 color, Shader shader = shade_set, Rect write_rect = FULL_RECT);
 
-		/// @brief Draws a vertical span on the destination image by stretching a region of the source image over a region of the destination image.
+		/// @brief Draws an axis-aligned span on the destination image by stretching a region of the source image over a region of the destination image.
 		/// @param dst The destination image.
-		/// @param dst_x The X coordinate to sample the span from on the destination image.
-		/// @param dst_span The span of the destination image.
+		/// @param dst_axis The fixed-axis coordinate to sample the span from on the destination image. The axis is determined by the inverse of the destination span settings.
+		/// @param dst_span The span of the destination image. The axis is determined by the span settings.
 		/// @param src The source image.
-		/// @param src_x The X coordinate to sample the span from on the destination image.
-		/// @param src_span The span of the source image to stretch over the span on the destination image.
+		/// @param src_axis The fixed-axis coordinate to sample the span from on the destination image. The axis is determined by the inverse of the source span settings.
+		/// @param src_span The span of the source image to stretch over the span on the destination image. The axis is determined by the span settings.
 		/// @param shader The shader to use.
 		/// @param sampler The sampler to use on the source image.
 		/// @param write_rect The area on the destination image that is writeable. All rendering outside this area is discarded. The entire destination image is selected by default. The region is automatically clipped to the maximally allowed dimensions on the destination image.
-		void stretch_span(Image &dst, int32_t dst_x, Span dst_span, const Image &src, Shader shader, Sampler sampler, int32_t src_x, Span src_span = FULL_SPAN, Rect write_rect = FULL_RECT);
+		void stretch_span(Image &dst, int32_t dst_axis, Span dst_span, const Image &src, Shader shader, Sampler sampler, int32_t src_axis, Span src_span = FULL_SPAN, Rect write_rect = FULL_RECT);
+
+		/// @brief Draws an axis-aligned span on the destination image by stretching a region of the source image over a region of the destination image.
+		/// @param dst The destination image.
+		/// @param dst_axis The fixed-axis coordinate to sample the span from on the destination image. The axis is determined by the inverse of the destination span settings.
+		/// @param dst_span The span of the destination image. The axis is determined by the span settings.
+		/// @param src The source image.
+		/// @param src_axis The fixed-axis coordinate to sample the span from on the destination image. The axis is determined by the inverse of the source span settings.
+		/// @param src_line Two points on the source image making up a 2D span to stretch over the destination span.
+		/// @param shader The shader to use.
+		/// @param sampler The sampler to use on the source image.
+		/// @param write_rect The area on the destination image that is writeable. All rendering outside this area is discarded. The entire destination image is selected by default. The region is automatically clipped to the maximally allowed dimensions on the destination image.
+		void stretch_span(Image &dst, int32_t dst_x, Span dst_span, const Image &src, Shader shader, Sampler sampler, Line src_line, Rect write_rect = FULL_RECT);
 
 		/// @brief Draws text using the built-in font on the 
 		/// @param dst The target image.
@@ -500,21 +596,201 @@ namespace cc0
 		/// @note This uses only a built-in font, but the effect can be replicated using any bitfont using the draw_image function and the 1bpp encoder/decoder functions.
 		int32_t print_text(Image &dst, Point p, const char *text, int32_t text_len, RGBA32 color, int32_t scale = 1, Rect write_rect = FULL_RECT);
 
-		// [ ] draw_triangle
-		//	[ ] void shade_triangle(); // barycentric interpolation but no texture
-		//	[ ] void texture_triangle(); // texture only
-		//	[ ] void draw_triangle(); // the whole shebang
-
 		/// @brief Fills the specified triangle area with the specified color using the specified shader (normal assignment is default).
 		/// @param dst The destination image.
 		/// @param a A point of the triangle.
 		/// @param b A point of the triangle.
-		/// @param c A point of the triangle/
+		/// @param c A point of the triangle.
 		/// @param color The input color.
 		/// @param shader The shader to use to blend colors (assignment is default).
 		/// @param write_rect The area on the destination image that is writeable. All rendering outside this area is discarded. The entire destination image is selected by default. The region is automatically clipped to the maximally allowed dimensions on the destination image.
 		void fill_tri(Image &dst, Point a, Point b, Point c, RGBA32 color, Shader shader = shade_set, Rect write_rect = FULL_RECT);
+
+		/// @brief An array of attributes that can be interpolated across a primitive.
+		/// @tparam attr_type The base type of the attributes.
+		/// @tparam attr_size The number of attributes.
+		template < typename attr_type, uint32_t attr_size >
+		using Attributes = attr_type[attr_size];
+
+		/// @brief A shader that takes a set of input attributes and returns a resulting color.
+		/// @tparam attr_type The base type of the attributes.
+		/// @tparam var_attr_size The number of elements in the varying attribute array.
+		/// @tparam const_attr_size The number of elements in the constant attribute array.
+		template < typename attr_type, uint32_t var_attr_size, typename const_attr_t >
+		using AttributeShader = RGBA32 (*)(RGBA32, const Attributes<attr_type,var_attr_size>&, const const_attr_t&);
+
+		/// @brief Interpolates a set of attributes across a triangle and inputs them into a custom shader.
+		/// @tparam attr_type The base type of the attributes.
+		/// @tparam var_attr_size The number of elements in the varying attribute array.
+		/// @tparam const_attr_size The number of elements in the constant attribute array.
+		/// @param dst The destination surface.
+		/// @param a A point of the triangle.
+		/// @param b A point of the triangle.
+		/// @param c A point of the triangle.
+		/// @param a_var The attributes to interpolate at the A point of the triangle.
+		/// @param b_var The attributes to interpolate at the B point of the triangle.
+		/// @param c_var The attributes to interpolate at the C point of the triangle.
+		/// @param consts A set of attributes that remains constant over the entire primitive.
+		/// @param shader The shader tp use to blend colors.
+		/// @param write_rect The area on the destination image that is writeable. All rendering outside this area is discarded. The entire destination image is selected by default. The region is automatically clipped to the maximally allowed dimensions on the destination image.
+		template < typename attr_type, uint32_t var_attr_size, typename const_attr_t >
+		void draw_tri(Image &dst, Point a, Point b, Point c, const Attributes<attr_type, var_attr_size> &a_var, const Attributes<attr_type, var_attr_size> &b_var, const Attributes<attr_type, var_attr_size> &c_var, const const_attr_t &consts, AttributeShader<attr_type, var_attr_size, const_attr_t> shader, Rect write_rect = FULL_RECT);
+
+		/// @brief Namespace for internal functions. Do not use these.
+		namespace internal
+		{
+			template < typename type_t >
+			void swap(type_t &a, type_t &b);
+
+			template < typename type_t >
+			type_t min(type_t a, type_t b);
+
+			template < typename type_t >
+			type_t min(type_t a, type_t b, type_t c);
+
+			template < typename type_t >
+			type_t max(type_t a, type_t b);
+
+			template < typename type_t >
+			type_t max(type_t a, type_t b, type_t c);
+
+			template < typename type_t >
+			type_t clamp(type_t min, type_t x, type_t max);
+
+			cc0::gfx::Rect order(cc0::gfx::Rect r);
+
+			cc0::gfx::Rect clip(cc0::gfx::Rect a, cc0::gfx::Rect b);
+
+			uint64_t determine_halfspace(cc0::gfx::Point a, cc0::gfx::Point b, cc0::gfx::Point point);
+			
+			bool is_top_left(cc0::gfx::Point a, cc0::gfx::Point b);
+		}
 	}
+}
+
+template < uint32_t bits, uint32_t precision > cc0::gfx::fixed<bits,precision> operator+(cc0::gfx::fixed<bits,precision> l, cc0::gfx::fixed<bits,precision> r) { return l += r; }
+template < uint32_t bits, uint32_t precision > cc0::gfx::fixed<bits,precision> operator-(cc0::gfx::fixed<bits,precision> l, cc0::gfx::fixed<bits,precision> r) { return l -= r; }
+template < uint32_t bits, uint32_t precision > cc0::gfx::fixed<bits,precision> operator*(cc0::gfx::fixed<bits,precision> l, cc0::gfx::fixed<bits,precision> r) { return l *= r; }
+template < uint32_t bits, uint32_t precision > cc0::gfx::fixed<bits,precision> operator/(cc0::gfx::fixed<bits,precision> l, cc0::gfx::fixed<bits,precision> r) { return l /= r; }
+
+template < typename attr_type, uint32_t var_attr_size, typename const_attr_t >
+void cc0::gfx::draw_tri(cc0::gfx::Image &dst, cc0::gfx::Point a, cc0::gfx::Point b, cc0::gfx::Point c, const cc0::gfx::Attributes<attr_type, var_attr_size> &a_var, const cc0::gfx::Attributes<attr_type, var_attr_size> &b_var, const cc0::gfx::Attributes<attr_type, var_attr_size> &c_var, const const_attr_t &consts, cc0::gfx::AttributeShader<attr_type, var_attr_size, const_attr_t> shader, cc0::gfx::Rect write_rect)
+{
+	cc0::gfx::Attributes<attr_type, var_attr_size> var;
+
+	write_rect = internal::clip(internal::order(write_rect), Rect{ Point{ 0, 0 }, Point{ dst.width, dst.height } });
+
+	// AABB Clipping
+	const int32_t min_y = internal::max(internal::min(a.y, b.y, c.y), write_rect.a.y);
+	const int32_t max_y = internal::min(internal::max(a.y, b.y, c.y), write_rect.b.y - 1);
+	if (max_y - min_y <= 0) { return; }
+	const int32_t min_x = internal::max(internal::min(a.x, b.x, c.x), write_rect.a.x);
+	const int32_t max_x = internal::min(internal::max(a.x, b.x, c.x), write_rect.b.x - 1);
+	if (max_x - min_x <= 0) { return; }
+
+	// Triangle setup
+	Point    p    = { min_x, min_y };
+	uint64_t w0_y = internal::determine_halfspace(b, c, p);
+	uint64_t w1_y = internal::determine_halfspace(c, a, p);
+	uint64_t w2_y = internal::determine_halfspace(a, b, p);
+
+	// Interpolation/triangle setup
+	const int64_t w2_x_inc = a.y - b.y;
+	const int64_t w2_y_inc = b.x - a.x;
+	const int64_t w0_x_inc = b.y - c.y;
+	const int64_t w0_y_inc = c.x - b.x;
+	const int64_t w1_x_inc = c.y - a.y;
+	const int64_t w1_y_inc = a.x - c.x;
+
+	const int64_t sum_inv_area_x2 = (1ULL<<47) / (w0_y + w1_y + w2_y);
+	int64_t       l0_y            =     w0_y * sum_inv_area_x2;
+	int64_t       l1_y            =     w1_y * sum_inv_area_x2;
+	int64_t       l2_y            =     w2_y * sum_inv_area_x2;
+	const int64_t l0_x_inc        = w0_x_inc * sum_inv_area_x2;
+	const int64_t l1_x_inc        = w1_x_inc * sum_inv_area_x2;
+	const int64_t l2_x_inc        = w2_x_inc * sum_inv_area_x2;
+	const int64_t l0_y_inc        = w0_y_inc * sum_inv_area_x2;
+	const int64_t l1_y_inc        = w1_y_inc * sum_inv_area_x2;
+	const int64_t l2_y_inc        = w2_y_inc * sum_inv_area_x2;
+
+	w0_y += internal::is_top_left(b, c) ? 0 : -1;
+	w1_y += internal::is_top_left(c, a) ? 0 : -1;
+	w2_y += internal::is_top_left(a, b) ? 0 : -1;
+
+	for (p.y = min_y; p.y <= max_y; ++p.y) {
+
+		int64_t w0 = int64_t(w0_y);
+		int64_t w1 = int64_t(w1_y);
+		int64_t w2 = int64_t(w2_y);
+
+		int64_t l0 = int64_t(l0_y);
+		int64_t l1 = int64_t(l1_y);
+		int64_t l2 = int64_t(l2_y);
+
+		for (p.x = min_x; p.x <= max_x; ++p.x) {
+
+			if ((w0 | w1 | w2) >= 0) {
+				for (int32_t i = 0; i < var_attr_size; ++i) {
+					var[i] = attr_type((l0 * a_var[i] + l1 * b_var[i] + l2 * c_var[i]) >> 32);
+				}
+				set_color(dst, p, shader(get_color(dst, p), var, consts));
+			}
+
+			w0 += w0_x_inc;
+			w1 += w1_x_inc;
+			w2 += w2_x_inc;
+
+			l0 += l0_x_inc;
+			l1 += l1_x_inc;
+			l2 += l2_x_inc;
+		}
+
+		w0_y += w0_y_inc;
+		w1_y += w1_y_inc;
+		w2_y += w2_y_inc;
+
+		l0_y += l0_y_inc;
+		l1_y += l1_y_inc;
+		l2_y += l2_y_inc;
+	}
+}
+
+template < typename type_t >
+void cc0::gfx::internal::swap(type_t &a, type_t &b)
+{
+	type_t t = a;
+	a = b;
+	b = t;
+}
+
+template < typename type_t >
+type_t cc0::gfx::internal::min(type_t a, type_t b)
+{
+	return a < b ? a : b;
+}
+
+template < typename type_t >
+type_t cc0::gfx::internal::min(type_t a, type_t b, type_t c)
+{
+	return cc0::gfx::internal::min(a, cc0::gfx::internal::min(b, c));
+}
+
+template < typename type_t >
+type_t cc0::gfx::internal::max(type_t a, type_t b)
+{
+	return a > b ? a : b;
+}
+
+template < typename type_t >
+type_t cc0::gfx::internal::max(type_t a, type_t b, type_t c)
+{
+	return cc0::gfx::internal::max(a, cc0::gfx::internal::max(b, c));
+}
+
+template < typename type_t >
+type_t cc0::gfx::internal::clamp(type_t min, type_t x, type_t max)
+{
+	return cc0::gfx::internal::max(min, cc0::gfx::internal::min(x, max));
 }
 
 #endif

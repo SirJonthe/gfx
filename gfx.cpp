@@ -76,65 +76,27 @@ static uint8_t FONT_ATLAS[] = { // The font bits as 1 bit per pixel.
 	0x3e, 0x3e, 0x3e, 0x00
 };
 
-template < typename type_t >
-void swap(type_t &a, type_t &b)
+cc0::gfx::Rect cc0::gfx::internal::order(cc0::gfx::Rect r)
 {
-	type_t t = a;
-	a = b;
-	b = t;
-}
-
-template < typename type_t >
-type_t min(type_t a, type_t b)
-{
-	return a < b ? a : b;
-}
-
-template < typename type_t >
-type_t min(type_t a, type_t b, type_t c)
-{
-	return min(a, min(b, c));
-}
-
-template < typename type_t >
-type_t max(type_t a, type_t b)
-{
-	return a > b ? a : b;
-}
-
-template < typename type_t >
-type_t max(type_t a, type_t b, type_t c)
-{
-	return max(a, max(b, c));
-}
-
-template < typename type_t >
-type_t clamp(type_t min, type_t x, type_t max)
-{
-	return ::max(min, ::min(x, max));
-}
-
-cc0::gfx::Rect order(cc0::gfx::Rect r)
-{
-	if (r.a.x > r.b.x) { swap(r.a.x, r.b.x); }
-	if (r.a.y > r.b.y) { swap(r.a.y, r.b.x); }
+	if (r.a.x > r.b.x) { cc0::gfx::internal::swap(r.a.x, r.b.x); }
+	if (r.a.y > r.b.y) { cc0::gfx::internal::swap(r.a.y, r.b.x); }
 	return r;
 }
 
-cc0::gfx::Rect clip(cc0::gfx::Rect a, cc0::gfx::Rect b)
+cc0::gfx::Rect cc0::gfx::internal::clip(cc0::gfx::Rect a, cc0::gfx::Rect b)
 {
 	return cc0::gfx::Rect{
-		cc0::gfx::Point{ max(a.a.x, b.a.x), max(a.a.y, b.a.y) },
-		cc0::gfx::Point{ min(a.b.x, b.b.x), min(a.b.y, b.b.y) }
+		cc0::gfx::Point{ cc0::gfx::internal::max(a.a.x, b.a.x), cc0::gfx::internal::max(a.a.y, b.a.y) },
+		cc0::gfx::Point{ cc0::gfx::internal::min(a.b.x, b.b.x), cc0::gfx::internal::min(a.b.y, b.b.y) }
 	};
 }
 
-uint64_t determine_halfspace(cc0::gfx::Point a, cc0::gfx::Point b, cc0::gfx::Point point)
+uint64_t cc0::gfx::internal::determine_halfspace(cc0::gfx::Point a, cc0::gfx::Point b, cc0::gfx::Point point)
 {
 	return uint64_t(b.x - a.x) * uint64_t(point.y - a.y) - uint64_t(b.y - a.y) * uint64_t(point.x - a.x);
 }
 
-bool is_top_left(cc0::gfx::Point a, cc0::gfx::Point b)
+bool cc0::gfx::internal::is_top_left(cc0::gfx::Point a, cc0::gfx::Point b)
 {
 	// strictly connected to winding order
 	return (a.x < b.x && b.y == a.y) || (a.y > b.y);
@@ -349,9 +311,9 @@ void cc0::gfx::encode_ARGB16(cc0::gfx::RGBA32 color, void *out)
 {
 	// bits = A RRRRR GGGGG BBBBB
 	constexpr uint32_t FIX_SCALAR = (32 << 8) / 255;
-	const uint32_t     r          = (uint32_t(color.red) * FIX_SCALAR) >> 8;
+	const uint32_t     r          = (uint32_t(color.red)   * FIX_SCALAR) >> 8;
 	const uint32_t     g          = (uint32_t(color.green) * FIX_SCALAR) >> 8;
-	const uint32_t     b          = (uint32_t(color.blue) * FIX_SCALAR) >> 8;
+	const uint32_t     b          = (uint32_t(color.blue)  * FIX_SCALAR) >> 8;
 	const uint32_t     a          = uint32_t(color.alpha > 0) << 15;
 	const uint16_t     pixel      = uint16_t(a) | uint16_t(r << 10) | uint16_t(g << 5) | uint16_t(b);
 	*((uint16_t*)out) = pixel;
@@ -369,9 +331,9 @@ void cc0::gfx::encode_ABGR16(cc0::gfx::RGBA32 color, void *out)
 {
 	// bits = A BBBBB GGGGG RRRRR
 	constexpr uint32_t FIX_SCALAR = (32 << 8) / 255;
-	const uint32_t     r          = (uint32_t(color.red) * FIX_SCALAR) >> 8;
+	const uint32_t     r          = (uint32_t(color.red)   * FIX_SCALAR) >> 8;
 	const uint32_t     g          = (uint32_t(color.green) * FIX_SCALAR) >> 8;
-	const uint32_t     b          = (uint32_t(color.blue) * FIX_SCALAR) >> 8;
+	const uint32_t     b          = (uint32_t(color.blue)  * FIX_SCALAR) >> 8;
 	const uint32_t     a          = uint32_t(color.alpha > 0) << 15;
 	const uint16_t     pixel      = uint16_t(a) | uint16_t(b << 10) | uint16_t(g << 5) | uint16_t(r);
 	*((uint16_t*)out) = pixel;
@@ -538,49 +500,24 @@ cc0::gfx::RGBA32 cc0::gfx::shade_gray(cc0::gfx::RGBA32, cc0::gfx::RGBA32 src)
 	return RGBA32{ GRAY, GRAY, GRAY, src.alpha };
 }
 
-cc0::gfx::RGBA32 cc0::gfx::shade_grayalpha(cc0::gfx::RGBA32 pDst, cc0::gfx::RGBA32 pSrc)
+cc0::gfx::RGBA32 cc0::gfx::shade_grayalpha(cc0::gfx::RGBA32 dst, cc0::gfx::RGBA32 src)
 {
-	return shade_alpha(pDst, shade_gray(pDst, pSrc));
+	return shade_alpha(dst, shade_gray(dst, src));
 }
 
-cc0::gfx::RGBA32 cc0::gfx::shade_graycolorkey(cc0::gfx::RGBA32 pDst, cc0::gfx::RGBA32 pSrc)
+cc0::gfx::RGBA32 cc0::gfx::shade_graycolorkey(cc0::gfx::RGBA32 dst, cc0::gfx::RGBA32 src)
 {
 	static const RGBA32   COLORKEY  = cc0::gfx::RGBA32{ 255, 0, 255, 0 };
 	static const uint32_t KEY       = *(uint32_t*)(&COLORKEY);
 	static const RGBA32   ALPHAMASK = cc0::gfx::RGBA32{ 255, 255, 255, 0 };
 	static const uint32_t MASK      = *(uint32_t*)(&ALPHAMASK);
-	return (((*(uint32_t*)(&pSrc)) & MASK) == KEY) ? pDst : shade_gray(pDst, pSrc);
+	return (((*(uint32_t*)(&src)) & MASK) == KEY) ? dst : shade_gray(dst, src);
 }
 
 cc0::gfx::RGBA32 cc0::gfx::shade_stencil(cc0::gfx::RGBA32 dst, cc0::gfx::RGBA32 src)
 {
 	return src.alpha > 0 ? src : dst;
 }
-
-//cc0::gfx::RGBA32 cc0::gfx::sample_bilinear(const cc0::gfx::Image &pImage, float pU, float pV)
-//{
-//	const float   fU = pU * (pImage.width  - 2); // [ ] Similar to how we need to access in the fixed-point version, but width - 1 instead.
-//	const float   fV = pV * (pImage.height - 2); // [ ] Similar to how we need to access in the fixed-point version, but height - 1 instead.
-//	const int32_t iU = (int32_t)fU;
-//	const int32_t iV = (int32_t)fV;
-//	
-//	const float u_ratio    = fU - iU;
-//	const float v_ratio    = fV - iV;
-//	const float u_opposite = 1.0f - u_ratio;
-//	const float v_opposite = 1.0f - v_ratio;
-//	
-//	const RGBA32 c00 = get_color(pImage, Point{ iU,     iV });
-//	const RGBA32 c01 = get_color(pImage, Point{ iU,     iV + 1 });
-//	const RGBA32 c10 = get_color(pImage, Point{ iU + 1, iV });
-//	const RGBA32 c11 = get_color(pImage, Point{ iU + 1, iV + 1 });
-//	
-//	return RGBA32{
-//		(uint8_t)((c00.red   * u_opposite + c10.red   * u_ratio) * v_opposite + (c01.red   * u_opposite + c11.red   * u_ratio) * v_ratio),
-//		(uint8_t)((c00.green * u_opposite + c10.green * u_ratio) * v_opposite + (c01.green * u_opposite + c11.green * u_ratio) * v_ratio),
-//		(uint8_t)((c00.blue  * u_opposite + c10.blue  * u_ratio) * v_opposite + (c01.blue  * u_opposite + c11.blue  * u_ratio) * v_ratio),
-//		(uint8_t)((c00.alpha * u_opposite + c10.alpha * u_ratio) * v_opposite + (c01.alpha * u_opposite + c11.alpha * u_ratio) * v_ratio)
-//	};
-//}
 
 template < typename type_t >
 type_t lerp(type_t a, type_t b, int32_t x)
@@ -641,8 +578,8 @@ void cc0::gfx::set_color(cc0::gfx::Image &dst, cc0::gfx::Point p, cc0::gfx::RGBA
 
 void cc0::gfx::fill_rect(cc0::gfx::Image &dst, cc0::gfx::Rect dst_rect, cc0::gfx::RGBA32 color, cc0::gfx::Shader shader, Rect write_rect)
 {
-	write_rect = clip(order(write_rect), Rect{ Point{ 0, 0 }, Point{ dst.width, dst.height } });
-	dst_rect = clip(order(dst_rect), write_rect);
+	write_rect = internal::clip(internal::order(write_rect), Rect{ Point{ 0, 0 }, Point{ dst.width, dst.height } });
+	dst_rect = internal::clip(internal::order(dst_rect), write_rect);
 	for (int32_t y = dst_rect.a.y; y < dst_rect.b.y; ++y) {
 		for (int32_t x = dst_rect.a.x; x < dst_rect.b.x; ++x) {
 			const Point p = { x, y };
@@ -740,22 +677,22 @@ void cc0::gfx::draw_line(cc0::gfx::Image &pDst, int32_t pX1, int32_t pY1, cc0::g
 
 void cc0::gfx::stretch_image(cc0::gfx::Image &dst, cc0::gfx::Rect dst_rect, const cc0::gfx::Image &src, cc0::gfx::Rect src_rect, cc0::gfx::Rect write_rect)
 {
-	write_rect = clip(order(write_rect), Rect{ Point{ 0, 0 }, Point{ dst.width, dst.height } });
+	write_rect = internal::clip(internal::order(write_rect), Rect{ Point{ 0, 0 }, Point{ dst.width, dst.height } });
 
 	if (src_rect.a.x == src_rect.b.x) { return; }
 	if (src_rect.a.y == src_rect.b.y) { return; }
 	if (dst_rect.a.x == dst_rect.b.x) { return; }
 	if (dst_rect.a.y == dst_rect.b.y) { return; }
 
-	src_rect = clip(src_rect, Rect{ Point{ 0, 0 }, Point{ src.width, src.height } });
+	src_rect = internal::clip(src_rect, Rect{ Point{ 0, 0 }, Point{ src.width, src.height } });
 
 	if (dst_rect.a.x > dst_rect.b.x) {
-		swap(dst_rect.a.x, dst_rect.b.x);
-		swap(src_rect.a.x, src_rect.b.x);
+		internal::swap(dst_rect.a.x, dst_rect.b.x);
+		internal::swap(src_rect.a.x, src_rect.b.x);
 	}
 	if (dst_rect.a.y > dst_rect.b.y) {
-		swap(dst_rect.a.y, dst_rect.b.y);
-		swap(src_rect.a.y, src_rect.b.y);
+		internal::swap(dst_rect.a.y, dst_rect.b.y);
+		internal::swap(src_rect.a.y, src_rect.b.y);
 	}
 
 	if (dst_rect.b.x < write_rect.a.x || dst_rect.a.x >= write_rect.b.x) { return; }
@@ -764,7 +701,7 @@ void cc0::gfx::stretch_image(cc0::gfx::Image &dst, cc0::gfx::Rect dst_rect, cons
 	const int32_t dsx = ((src_rect.b.x - src_rect.a.x) << 15) / (dst_rect.b.x - dst_rect.a.x);
 	const int32_t dsy = ((src_rect.b.y - src_rect.a.y) << 15) / (dst_rect.b.y - dst_rect.a.y);
 
-	int32_t ssx = dsx >= 0 ? (min(src_rect.a.x, src_rect.b.x) << 15) : ((max(src_rect.a.x, src_rect.b.x) << 15) + dsx);
+	int32_t ssx = dsx >= 0 ? (internal::min(src_rect.a.x, src_rect.b.x) << 15) : ((internal::max(src_rect.a.x, src_rect.b.x) << 15) + dsx);
 	if (dst_rect.a.x < write_rect.a.x) {
 		ssx += dsx * (write_rect.a.x - dst_rect.a.x);
 		dst_rect.a.x = write_rect.a.x;
@@ -773,7 +710,7 @@ void cc0::gfx::stretch_image(cc0::gfx::Image &dst, cc0::gfx::Rect dst_rect, cons
 		dst_rect.b.x = write_rect.b.x;
 	}
 
-	int32_t ssy = dsy >= 0 ? (min(src_rect.a.y, src_rect.b.y) << 15) : ((max(src_rect.a.y, src_rect.b.y) << 15) + dsy);
+	int32_t ssy = dsy >= 0 ? (internal::min(src_rect.a.y, src_rect.b.y) << 15) : ((internal::max(src_rect.a.y, src_rect.b.y) << 15) + dsy);
 	if (dst_rect.a.y < write_rect.a.y) {
 		ssy += dsy * (write_rect.a.y - dst_rect.a.y);
 		dst_rect.a.y = write_rect.a.y;
@@ -803,22 +740,22 @@ void cc0::gfx::stretch_image(Image &dst, Rect dst_rect, const Image &src, Shader
 {
 	// [ ] We probably need to interpolate normalized texture coordinates because bilinear needs to interpolate 0 - width-1, while nearest needs to interpolate 0 - width.
 
-	write_rect = clip(order(write_rect), Rect{ Point{ 0, 0 }, Point{ dst.width, dst.height } });
+	write_rect = internal::clip(internal::order(write_rect), Rect{ Point{ 0, 0 }, Point{ dst.width, dst.height } });
 
 	if (src_rect.a.x == src_rect.b.x) { return; }
 	if (src_rect.a.y == src_rect.b.y) { return; }
 	if (dst_rect.a.x == dst_rect.b.x) { return; }
 	if (dst_rect.a.y == dst_rect.b.y) { return; }
 
-	src_rect = clip(src_rect, Rect{ Point{ 0, 0 }, Point{ src.width, src.height } });
+	src_rect = internal::clip(src_rect, Rect{ Point{ 0, 0 }, Point{ src.width, src.height } });
 
 	if (dst_rect.a.x > dst_rect.b.x) {
-		swap(dst_rect.a.x, dst_rect.b.x);
-		swap(src_rect.a.x, src_rect.b.x);
+		internal::swap(dst_rect.a.x, dst_rect.b.x);
+		internal::swap(src_rect.a.x, src_rect.b.x);
 	}
 	if (dst_rect.a.y > dst_rect.b.y) {
-		swap(dst_rect.a.y, dst_rect.b.y);
-		swap(src_rect.a.y, src_rect.b.y);
+		internal::swap(dst_rect.a.y, dst_rect.b.y);
+		internal::swap(src_rect.a.y, src_rect.b.y);
 	}
 
 	if (dst_rect.b.x < write_rect.a.x || dst_rect.a.x >= write_rect.b.x) { return; }
@@ -827,7 +764,7 @@ void cc0::gfx::stretch_image(Image &dst, Rect dst_rect, const Image &src, Shader
 	const int32_t dsx = ((src_rect.b.x - src_rect.a.x) << 15) / (dst_rect.b.x - dst_rect.a.x);
 	const int32_t dsy = ((src_rect.b.y - src_rect.a.y) << 15) / (dst_rect.b.y - dst_rect.a.y);
 
-	int32_t ssx = dsx >= 0 ? (min(src_rect.a.x, src_rect.b.x) << 15) : ((max(src_rect.a.x, src_rect.b.x) << 15) + dsx);
+	int32_t ssx = dsx >= 0 ? (internal::min(src_rect.a.x, src_rect.b.x) << 15) : ((internal::max(src_rect.a.x, src_rect.b.x) << 15) + dsx);
 	if (dst_rect.a.x < write_rect.a.x) {
 		ssx += dsx * (write_rect.a.x - dst_rect.a.x);
 		dst_rect.a.x = write_rect.a.x;
@@ -836,7 +773,7 @@ void cc0::gfx::stretch_image(Image &dst, Rect dst_rect, const Image &src, Shader
 		dst_rect.b.x = write_rect.b.x;
 	}
 
-	int32_t ssy = dsy >= 0 ? (min(src_rect.a.y, src_rect.b.y) << 15) : ((max(src_rect.a.y, src_rect.b.y) << 15) + dsy);
+	int32_t ssy = dsy >= 0 ? (internal::min(src_rect.a.y, src_rect.b.y) << 15) : ((internal::max(src_rect.a.y, src_rect.b.y) << 15) + dsy);
 	if (dst_rect.a.y < write_rect.a.y) {
 		ssy += dsy * (write_rect.a.y - dst_rect.a.y);
 		dst_rect.a.y = write_rect.a.y;
@@ -859,46 +796,108 @@ void cc0::gfx::stretch_image(Image &dst, Rect dst_rect, const Image &src, Shader
 	}
 }
 
-void cc0::gfx::fill_span(cc0::gfx::Image &dst, int32_t dst_x, cc0::gfx::Span dst_span, cc0::gfx::RGBA32 color, cc0::gfx::Shader shader, cc0::gfx::Rect write_rect)
+#define arr(X) ((int32_t*)(&(X)))
+
+void cc0::gfx::fill_span(cc0::gfx::Image &dst, int32_t dst_axis, cc0::gfx::Span dst_span, cc0::gfx::RGBA32 color, cc0::gfx::Shader shader, cc0::gfx::Rect write_rect)
 {
-	write_rect = clip(order(write_rect), Rect{ Point{ 0, 0 }, Point{ dst.width, dst.height } });
+	write_rect = internal::clip(internal::order(write_rect), Rect{ Point{ 0, 0 }, Point{ dst.width, dst.height } });
 
-	if (dst_x < write_rect.a.x || dst_x >= write_rect.b.x) { return; }
+	const int32_t fixed_axis = (dst_span.axis + 1) & 1;
+	const int32_t float_axis = dst_span.axis & 1;
 
-	if (dst_span.a > dst_span.b) { swap(dst_span.a, dst_span.b); }
-	dst_span.a = max(dst_span.a, write_rect.a.y);
-	dst_span.b = min(dst_span.b, write_rect.b.y);
+	if (dst_axis < arr(write_rect.a)[fixed_axis] || dst_axis >= arr(write_rect.b)[fixed_axis]) { return; }
 
-	for (int32_t y = dst_span.a; y < dst_span.b; ++y) {
-		set_color(dst, Point{ dst_x, y }, shader(get_color(dst, Point{ dst_x, y }), color));
+	if (dst_span.a > dst_span.b) { internal::swap(dst_span.a, dst_span.b); }
+	dst_span.a = internal::max(dst_span.a, arr(write_rect.a)[float_axis]);
+	dst_span.b = internal::min(dst_span.b, arr(write_rect.b)[float_axis]);
+
+	Point p = {
+		fixed_axis == 0 ? dst_axis : dst_span.a,
+		fixed_axis == 0 ? dst_span.a : dst_axis
+	};
+	for (; arr(p)[float_axis] < dst_span.b; ++arr(p)[float_axis]) {
+		set_color(dst, p, shader(get_color(dst, p), color));
 	}
 }
 
-void cc0::gfx::stretch_span(cc0::gfx::Image &dst, int32_t dst_x, cc0::gfx::Span dst_span, const cc0::gfx::Image &src, cc0::gfx::Shader shader, cc0::gfx::Sampler sampler, int32_t src_x, cc0::gfx::Span src_span, cc0::gfx::Rect write_rect)
+void cc0::gfx::stretch_span(cc0::gfx::Image &dst, int32_t dst_axis, cc0::gfx::Span dst_span, const cc0::gfx::Image &src, cc0::gfx::Shader shader, cc0::gfx::Sampler sampler, int32_t src_axis, cc0::gfx::Span src_span, cc0::gfx::Rect write_rect)
 {
-	write_rect = clip(order(write_rect), Rect{ Point{ 0, 0 }, Point{ dst.width, dst.height } });
+	write_rect = internal::clip(internal::order(write_rect), Rect{ Point{ 0, 0 }, Point{ dst.width, dst.height } });
 
-	if (dst_x < write_rect.a.x || dst_x >= write_rect.b.x) { return; }
+	const int32_t d_fixed_axis = (dst_span.axis + 1) & 1;
+	const int32_t d_float_axis = dst_span.axis & 1;
+
+	if (dst_axis < arr(write_rect.a)[d_fixed_axis] || dst_axis >= arr(write_rect.b)[d_fixed_axis]) { return; }
 
 	if (dst_span.a > dst_span.b) {
-		swap(dst_span.a, dst_span.b);
-		swap(src_span.a, src_span.b);
+		internal::swap(dst_span.a, dst_span.b);
+		internal::swap(src_span.a, src_span.b);
 	}
+
+	const int32_t s_fixed_axis = (src_span.axis + 1) & 1;
+	const int32_t s_float_axis = src_span.axis & 1;
 
 	const int32_t dss = ((src_span.b - src_span.a) << 15) / (dst_span.b - dst_span.a);
-	int32_t src_y = src_span.a << 15;
-	src_x <<= 15;
+	
+	Point s = {
+		(s_fixed_axis == 0 ? src_axis : src_span.a) << 15,
+		(s_fixed_axis == 0 ? src_span.a : src_axis) << 15
+	};
 
-	if (dst_span.a < write_rect.a.y) {
-		src_y += dss * (write_rect.a.y - dst_span.a);
+	if (dst_span.a < arr(write_rect.a)[d_float_axis]) {
+		arr(s)[s_float_axis] += dss * (write_rect.a.y - dst_span.a);
 		dst_span.a = write_rect.a.y;
 	}
-	dst_span.b = min(dst_span.b, write_rect.b.y);
+	dst_span.b = internal::min(dst_span.b, write_rect.b.y);
 
-	for (int32_t y = dst_span.a; y < dst_span.b; ++y, src_y += dss) {
-		set_color(dst, Point{ dst_x, y }, shader(get_color(dst, Point{ dst_x, y }), sampler(src, src_x, src_y)));
+	Point p = {
+		d_fixed_axis == 0 ? dst_axis : dst_span.a,
+		d_fixed_axis == 0 ? dst_span.a : dst_axis
+	};
+	for (; arr(p)[d_float_axis] < dst_span.b; ++arr(p)[d_float_axis], arr(s)[s_float_axis] += dss) {
+		set_color(dst, p, shader(get_color(dst, p), sampler(src, s.x, s.y)));
 	}
 }
+
+void cc0::gfx::stretch_span(cc0::gfx::Image &dst, int32_t dst_axis, cc0::gfx::Span dst_span, const cc0::gfx::Image &src, cc0::gfx::Shader shader, cc0::gfx::Sampler sampler, cc0::gfx::Line src_line, cc0::gfx::Rect write_rect)
+{
+	write_rect = internal::clip(internal::order(write_rect), Rect{ Point{ 0, 0 }, Point{ dst.width, dst.height } });
+
+	const int32_t fixed_axis = (dst_span.axis + 1) & 1;
+	const int32_t float_axis = dst_span.axis & 1;
+
+	if (dst_axis < arr(write_rect.a)[fixed_axis] || dst_axis >= arr(write_rect.b)[fixed_axis]) { return; }
+
+	if (dst_span.a > dst_span.b) {
+		internal::swap(dst_span.a, dst_span.b);
+		internal::swap(src_line.a, src_line.b);
+	}
+
+	const int32_t dsx = ((src_line.b.x - src_line.a.x) << 15) / (dst_span.b - dst_span.a);
+	const int32_t dsy = ((src_line.b.y - src_line.a.y) << 15) / (dst_span.b - dst_span.a);
+	
+	Point s = {
+		src_line.a.x.x,
+		src_line.a.y.x
+	};
+
+	if (dst_span.a < arr(write_rect.a)[float_axis]) {
+		s.x += dsx * (write_rect.a.y - dst_span.a);
+		s.y += dsy * (write_rect.a.y - dst_span.a);
+		dst_span.a = write_rect.a.y;
+	}
+	dst_span.b = internal::min(dst_span.b, write_rect.b.y);
+
+	Point p = {
+		fixed_axis == 0 ? dst_axis : dst_span.a,
+		fixed_axis == 0 ? dst_span.a : dst_axis
+	};
+	for (; arr(p)[float_axis] < dst_span.b; ++arr(p)[float_axis], s.x += dsx, s.y += dsy) {
+		set_color(dst, p, shader(get_color(dst, p), sampler(src, s.x, s.y)));
+	}
+}
+
+#undef arr
 
 int32_t cc0::gfx::print_text(cc0::gfx::Image &dst, cc0::gfx::Point p, const char *text, int32_t text_len, cc0::gfx::RGBA32 color, int32_t scale, cc0::gfx::Rect write_rect)
 {
@@ -1052,21 +1051,21 @@ int32_t cc0::gfx::print_text(cc0::gfx::Image &dst, cc0::gfx::Point p, const char
 
 void cc0::gfx::fill_tri(cc0::gfx::Image &dst, cc0::gfx::Point a, cc0::gfx::Point b, cc0::gfx::Point c, cc0::gfx::RGBA32 color, cc0::gfx::Shader shader, cc0::gfx::Rect write_rect)
 {
-	write_rect = clip(order(write_rect), Rect{ Point{ 0, 0 }, Point{ dst.width, dst.height } });
+	write_rect = internal::clip(internal::order(write_rect), Rect{ Point{ 0, 0 }, Point{ dst.width, dst.height } });
 
 	// AABB Clipping
-	const int32_t min_y = max(min(a.y, b.y, c.y), write_rect.a.y);
-	const int32_t max_y = min(max(a.y, b.y, c.y), write_rect.b.y - 1);
+	const int32_t min_y = internal::max(internal::min(a.y, b.y, c.y), write_rect.a.y);
+	const int32_t max_y = internal::min(internal::max(a.y, b.y, c.y), write_rect.b.y - 1);
 	if (max_y - min_y <= 0) { return; }
-	const int32_t min_x = max(min(a.x, b.x, c.x), write_rect.a.x);
-	const int32_t max_x = min(max(a.x, b.x, c.x), write_rect.b.x - 1);
+	const int32_t min_x = internal::max(internal::min(a.x, b.x, c.x), write_rect.a.x);
+	const int32_t max_x = internal::min(internal::max(a.x, b.x, c.x), write_rect.b.x - 1);
 	if (max_x - min_x <= 0) { return; }
 
 	// Triangle setup
 	Point   p    = { min_x, min_y };
-	int64_t w0_y = determine_halfspace(b, c, p) + (int64_t(is_top_left(b, c)) - 1);
-	int64_t w1_y = determine_halfspace(c, a, p) + (int64_t(is_top_left(c, a)) - 1);
-	int64_t w2_y = determine_halfspace(a, b, p) + (int64_t(is_top_left(a, b)) - 1);
+	int64_t w0_y = internal::determine_halfspace(b, c, p) + (int64_t(internal::is_top_left(b, c)) - 1);
+	int64_t w1_y = internal::determine_halfspace(c, a, p) + (int64_t(internal::is_top_left(c, a)) - 1);
+	int64_t w2_y = internal::determine_halfspace(a, b, p) + (int64_t(internal::is_top_left(a, b)) - 1);
 
 	// Interpolation/triangle setup
 	const int32_t w2_x_inc = a.y - b.y;
