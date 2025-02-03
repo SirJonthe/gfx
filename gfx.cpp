@@ -76,43 +76,43 @@ static uint8_t FONT_ATLAS[] = { // The font bits as 1 bit per pixel.
 	0x3e, 0x3e, 0x3e, 0x00
 };
 
-cc0::gfx::Rect cc0::gfx::internal::order(cc0::gfx::Rect r)
+cc0::gfx::Rect<int32_t> cc0::gfx::internal::order(cc0::gfx::Rect<int32_t> r)
 {
 	if (r.a.x > r.b.x) { cc0::gfx::internal::swap(r.a.x, r.b.x); }
 	if (r.a.y > r.b.y) { cc0::gfx::internal::swap(r.a.y, r.b.x); }
 	return r;
 }
 
-cc0::gfx::Rect cc0::gfx::internal::clip(cc0::gfx::Rect a, cc0::gfx::Rect b)
+cc0::gfx::Rect<int32_t> cc0::gfx::internal::clip(cc0::gfx::Rect<int32_t> a, cc0::gfx::Rect<int32_t> b)
 {
-	return cc0::gfx::Rect{
-		cc0::gfx::Point{ cc0::gfx::internal::max(a.a.x, b.a.x), cc0::gfx::internal::max(a.a.y, b.a.y) },
-		cc0::gfx::Point{ cc0::gfx::internal::min(a.b.x, b.b.x), cc0::gfx::internal::min(a.b.y, b.b.y) }
+	return cc0::gfx::Rect<int32_t>{
+		cc0::gfx::Point<int32_t>{ cc0::gfx::internal::max(a.a.x, b.a.x), cc0::gfx::internal::max(a.a.y, b.a.y) },
+		cc0::gfx::Point<int32_t>{ cc0::gfx::internal::min(a.b.x, b.b.x), cc0::gfx::internal::min(a.b.y, b.b.y) }
 	};
 }
 
-uint64_t cc0::gfx::internal::determine_halfspace(cc0::gfx::Point a, cc0::gfx::Point b, cc0::gfx::Point point)
+uint64_t cc0::gfx::internal::determine_halfspace(cc0::gfx::Point<int32_t> a, cc0::gfx::Point<int32_t> b, cc0::gfx::Point<int32_t> point)
 {
 	return uint64_t(b.x - a.x) * uint64_t(point.y - a.y) - uint64_t(b.y - a.y) * uint64_t(point.x - a.x);
 }
 
-bool cc0::gfx::internal::is_top_left(cc0::gfx::Point a, cc0::gfx::Point b)
+bool cc0::gfx::internal::is_top_left(cc0::gfx::Point<int32_t> a, cc0::gfx::Point<int32_t> b)
 {
 	// strictly connected to winding order
 	return (a.x < b.x && b.y == a.y) || (a.y > b.y);
 }
 
-int32_t cc0::gfx::index_linear(const cc0::gfx::Image &src, cc0::gfx::Point p)
+int32_t cc0::gfx::index_linear(const cc0::gfx::Image &src, cc0::gfx::Point<int32_t> p)
 {
 	return (src.width * p.y) + p.x;
 }
 
-int32_t cc0::gfx::index_repeat_linear(const cc0::gfx::Image &src, cc0::gfx::Point p)
+int32_t cc0::gfx::index_repeat_linear(const cc0::gfx::Image &src, cc0::gfx::Point<int32_t> p)
 {
-	return index_linear(src, Point{ p.x % src.width, p.y % src.height });
+	return index_linear(src, Point<int32_t>{ p.x % src.width, p.y % src.height });
 }
 
-int32_t cc0::gfx::index_z(const cc0::gfx::Image&, cc0::gfx::Point p)
+int32_t cc0::gfx::index_z(const cc0::gfx::Image&, cc0::gfx::Point<int32_t> p)
 {
 	p.x = (p.x | (p.x << 8)) & 0x00FF00FF;
 	p.x = (p.x | (p.x << 4)) & 0x0F0F0F0F;
@@ -127,9 +127,9 @@ int32_t cc0::gfx::index_z(const cc0::gfx::Image&, cc0::gfx::Point p)
 	return p.x | (p.y << 1);
 }
 
-int32_t cc0::gfx::index_repeat_z(const cc0::gfx::Image &src, cc0::gfx::Point p)
+int32_t cc0::gfx::index_repeat_z(const cc0::gfx::Image &src, cc0::gfx::Point<int32_t> p)
 {
-	return index_z(src, Point{ p.x % src.width, p.y % src.height });
+	return index_z(src, Point<int32_t>{ p.x % src.width, p.y % src.height });
 }
 
 cc0::gfx::RGBA32 cc0::gfx::decode_RGBA16(const void *pixel)
@@ -354,114 +354,114 @@ void cc0::gfx::encode_1bpp(uint8_t color, void *out, int32_t i)
 	*(uint8_t*)out = (color > 0) ? (mask | index) : (mask & (~index));
 }
 
-cc0::gfx::RGBA32 cc0::gfx::decode_RGBA16(const cc0::gfx::Image &src, cc0::gfx::Point p)
+cc0::gfx::RGBA32 cc0::gfx::decode_RGBA16(const cc0::gfx::Image &src, cc0::gfx::Point<int32_t> p)
 {
 	return decode_RGBA16(src.pixels + src.index(src, p) * 2);
 }
 
-cc0::gfx::RGBA32 cc0::gfx::decode_RGB24(const cc0::gfx::Image &src, cc0::gfx::Point p)
+cc0::gfx::RGBA32 cc0::gfx::decode_RGB24(const cc0::gfx::Image &src, cc0::gfx::Point<int32_t> p)
 {
 	return decode_RGB24(src.pixels + src.index(src, p) * 3);
 }
 
-cc0::gfx::RGBA32 cc0::gfx::decode_RGBA32(const cc0::gfx::Image &src, cc0::gfx::Point p)
+cc0::gfx::RGBA32 cc0::gfx::decode_RGBA32(const cc0::gfx::Image &src, cc0::gfx::Point<int32_t> p)
 {
 	return decode_RGBA32(src.pixels + src.index(src, p) * 3);
 }
 
-cc0::gfx::RGBA32 cc0::gfx::decode_BGRA16(const cc0::gfx::Image &src, cc0::gfx::Point p)
+cc0::gfx::RGBA32 cc0::gfx::decode_BGRA16(const cc0::gfx::Image &src, cc0::gfx::Point<int32_t> p)
 {
 	return decode_BGRA16(src.pixels + src.index(src, p) * 2);
 }
 
-cc0::gfx::RGBA32 cc0::gfx::decode_BGR24 (const cc0::gfx::Image &src, cc0::gfx::Point p)
+cc0::gfx::RGBA32 cc0::gfx::decode_BGR24 (const cc0::gfx::Image &src, cc0::gfx::Point<int32_t> p)
 {
 	return decode_BGR24(src.pixels + src.index(src, p) * 3);
 }
 
-cc0::gfx::RGBA32 cc0::gfx::decode_BGRA32(const cc0::gfx::Image &src, cc0::gfx::Point p)
+cc0::gfx::RGBA32 cc0::gfx::decode_BGRA32(const cc0::gfx::Image &src, cc0::gfx::Point<int32_t> p)
 {
 	return decode_BGRA32(src.pixels + src.index(src, p) * 4);
 }
 
-cc0::gfx::RGBA32 cc0::gfx::decode_ARGB16(const cc0::gfx::Image &src, cc0::gfx::Point p)
+cc0::gfx::RGBA32 cc0::gfx::decode_ARGB16(const cc0::gfx::Image &src, cc0::gfx::Point<int32_t> p)
 {
 	return decode_ARGB16(src.pixels + src.index(src, p) * 2);
 }
 
-cc0::gfx::RGBA32 cc0::gfx::decode_ARGB32(const cc0::gfx::Image &src, cc0::gfx::Point p)
+cc0::gfx::RGBA32 cc0::gfx::decode_ARGB32(const cc0::gfx::Image &src, cc0::gfx::Point<int32_t> p)
 {
 	return decode_ARGB32(src.pixels + src.index(src, p) * 4);
 }
 
-cc0::gfx::RGBA32 cc0::gfx::decode_ABGR16(const cc0::gfx::Image &src, cc0::gfx::Point p)
+cc0::gfx::RGBA32 cc0::gfx::decode_ABGR16(const cc0::gfx::Image &src, cc0::gfx::Point<int32_t> p)
 {
 	return decode_ABGR16(src.pixels + src.index(src, p) * 2);
 }
 
-cc0::gfx::RGBA32 cc0::gfx::decode_ABGR32(const cc0::gfx::Image &src, cc0::gfx::Point p)
+cc0::gfx::RGBA32 cc0::gfx::decode_ABGR32(const cc0::gfx::Image &src, cc0::gfx::Point<int32_t> p)
 {
 	return decode_ABGR32(src.pixels + src.index(src, p) * 4);
 }
 
-cc0::gfx::RGBA32 cc0::gfx::decode_1bpp(const cc0::gfx::Image &src, cc0::gfx::Point p)
+cc0::gfx::RGBA32 cc0::gfx::decode_1bpp(const cc0::gfx::Image &src, cc0::gfx::Point<int32_t> p)
 {
 	const uint32_t INDEX = src.index(src, p);
 	const uint8_t  MASK = decode_1bpp(((const uint8_t*)src.pixels)[INDEX >> 3], INDEX & 7);
 	return RGBA32{ MASK, MASK, MASK, MASK };
 }
 
-void cc0::gfx::encode_RGBA16(cc0::gfx::Image &dst, cc0::gfx::Point p, cc0::gfx::RGBA32 color)
+void cc0::gfx::encode_RGBA16(cc0::gfx::Image &dst, cc0::gfx::Point<int32_t> p, cc0::gfx::RGBA32 color)
 {
 	encode_RGBA16(color, dst.pixels + dst.index(dst, p) * 2);
 }
 
-void cc0::gfx::encode_RGB24(cc0::gfx::Image &dst, cc0::gfx::Point p, cc0::gfx::RGBA32 color)
+void cc0::gfx::encode_RGB24(cc0::gfx::Image &dst, cc0::gfx::Point<int32_t> p, cc0::gfx::RGBA32 color)
 {
 	encode_RGB24(color, dst.pixels + dst.index(dst, p) * 3);
 }
 
-void cc0::gfx::encode_RGBA32(cc0::gfx::Image &dst, cc0::gfx::Point p, cc0::gfx::RGBA32 color)
+void cc0::gfx::encode_RGBA32(cc0::gfx::Image &dst, cc0::gfx::Point<int32_t> p, cc0::gfx::RGBA32 color)
 {
 	encode_RGBA32(color, dst.pixels + dst.index(dst, p) * 4);
 }
 
-void cc0::gfx::encode_BGRA16(cc0::gfx::Image &dst, cc0::gfx::Point p, cc0::gfx::RGBA32 color)
+void cc0::gfx::encode_BGRA16(cc0::gfx::Image &dst, cc0::gfx::Point<int32_t> p, cc0::gfx::RGBA32 color)
 {
 	encode_BGRA16(color, dst.pixels + dst.index(dst, p) * 2);
 }
 
-void cc0::gfx::encode_BGR24(cc0::gfx::Image &dst, cc0::gfx::Point p, cc0::gfx::RGBA32 color)
+void cc0::gfx::encode_BGR24(cc0::gfx::Image &dst, cc0::gfx::Point<int32_t> p, cc0::gfx::RGBA32 color)
 {
 	encode_BGR24(color, dst.pixels + dst.index(dst, p) * 3);
 }
 
-void cc0::gfx::encode_BGRA32(cc0::gfx::Image &dst, cc0::gfx::Point p, cc0::gfx::RGBA32 color)
+void cc0::gfx::encode_BGRA32(cc0::gfx::Image &dst, cc0::gfx::Point<int32_t> p, cc0::gfx::RGBA32 color)
 {
 	encode_BGRA32(color, dst.pixels + dst.index(dst, p) * 4);
 }
 
-void cc0::gfx::encode_ARGB16(cc0::gfx::Image &dst, cc0::gfx::Point p, cc0::gfx::RGBA32 color)
+void cc0::gfx::encode_ARGB16(cc0::gfx::Image &dst, cc0::gfx::Point<int32_t> p, cc0::gfx::RGBA32 color)
 {
 	encode_ARGB16(color, dst.pixels + dst.index(dst, p) * 2);
 }
 
-void cc0::gfx::encode_ARGB32(cc0::gfx::Image &dst, cc0::gfx::Point p, cc0::gfx::RGBA32 color)
+void cc0::gfx::encode_ARGB32(cc0::gfx::Image &dst, cc0::gfx::Point<int32_t> p, cc0::gfx::RGBA32 color)
 {
 	encode_ARGB32(color, dst.pixels + dst.index(dst, p) * 4);
 }
 
-void cc0::gfx::encode_ABGR16(cc0::gfx::Image &dst, cc0::gfx::Point p, cc0::gfx::RGBA32 color)
+void cc0::gfx::encode_ABGR16(cc0::gfx::Image &dst, cc0::gfx::Point<int32_t> p, cc0::gfx::RGBA32 color)
 {
 	encode_ABGR16(color, dst.pixels + dst.index(dst, p) * 2);
 }
 
-void cc0::gfx::encode_ABGR32(cc0::gfx::Image &dst, cc0::gfx::Point p, cc0::gfx::RGBA32 color)
+void cc0::gfx::encode_ABGR32(cc0::gfx::Image &dst, cc0::gfx::Point<int32_t> p, cc0::gfx::RGBA32 color)
 {
 	encode_ABGR32(color, dst.pixels + dst.index(dst, p) * 4);
 }
 
-void cc0::gfx::encode_1bpp(cc0::gfx::Image &dst, cc0::gfx::Point p, cc0::gfx::RGBA32 color)
+void cc0::gfx::encode_1bpp(cc0::gfx::Image &dst, cc0::gfx::Point<int32_t> p, cc0::gfx::RGBA32 color)
 {
 	const uint32_t INDEX = dst.index(dst, p);
 	encode_1bpp(color.alpha > 0, ((uint8_t*)dst.pixels) + (INDEX >> 3), INDEX & 7);
@@ -543,17 +543,17 @@ cc0::gfx::RGBA32 rgba_bilerp(cc0::gfx::RGBA32 p00, cc0::gfx::RGBA32 p10, cc0::gf
 
 cc0::gfx::RGBA32 cc0::gfx::sample_nearest(const cc0::gfx::Image &pImage, int32_t pU, int32_t pV)
 {
-	return get_color(pImage, Point{ pU >> 15, pV >> 15 });
+	return get_color(pImage, Point<int32_t>{ pU >> 15, pV >> 15 });
 }
 
 cc0::gfx::RGBA32 cc0::gfx::sample_bilinear(const cc0::gfx::Image &pImage, int32_t pU, int32_t pV)
 {
 	const int32_t x = pU >> 15;
 	const int32_t y = pV >> 15;
-	const RGBA32 c00 = get_color(pImage, Point{ x,     y });
-	const RGBA32 c01 = get_color(pImage, Point{ x,     y + 1 });
-	const RGBA32 c10 = get_color(pImage, Point{ x + 1, y });
-	const RGBA32 c11 = get_color(pImage, Point{ x + 1, y + 1 });
+	const RGBA32 c00 = get_color(pImage, Point<int32_t>{ x,     y });
+	const RGBA32 c01 = get_color(pImage, Point<int32_t>{ x,     y + 1 });
+	const RGBA32 c10 = get_color(pImage, Point<int32_t>{ x + 1, y });
+	const RGBA32 c11 = get_color(pImage, Point<int32_t>{ x + 1, y + 1 });
 	return rgba_bilerp(c00, c10, c01, c11, pU & 0x7fff, pV & 0x7fff);
 }
 
@@ -566,23 +566,23 @@ cc0::gfx::Image cc0::gfx::new_image(void *pixels, int32_t width, int32_t height,
 	};
 }
 
-cc0::gfx::RGBA32 cc0::gfx::get_color(const cc0::gfx::Image &src, cc0::gfx::Point p)
+cc0::gfx::RGBA32 cc0::gfx::get_color(const cc0::gfx::Image &src, cc0::gfx::Point<int32_t> p)
 {
 	return src.decode(src, p);
 }
 
-void cc0::gfx::set_color(cc0::gfx::Image &dst, cc0::gfx::Point p, cc0::gfx::RGBA32 c)
+void cc0::gfx::set_color(cc0::gfx::Image &dst, cc0::gfx::Point<int32_t> p, cc0::gfx::RGBA32 c)
 {
 	dst.encode(dst, p, c);
 }
 
-void cc0::gfx::fill_rect(cc0::gfx::Image &dst, cc0::gfx::Rect dst_rect, cc0::gfx::RGBA32 color, cc0::gfx::Shader shader, Rect write_rect)
+void cc0::gfx::fill_rect(cc0::gfx::Image &dst, cc0::gfx::Rect<int32_t> dst_rect, cc0::gfx::RGBA32 color, cc0::gfx::Shader shader, Rect<int32_t> write_rect)
 {
-	write_rect = internal::clip(internal::order(write_rect), Rect{ Point{ 0, 0 }, Point{ dst.width, dst.height } });
+	write_rect = internal::clip(internal::order(write_rect), Rect<int32_t>{ Point<int32_t>{ 0, 0 }, Point<int32_t>{ dst.width, dst.height } });
 	dst_rect = internal::clip(internal::order(dst_rect), write_rect);
 	for (int32_t y = dst_rect.a.y; y < dst_rect.b.y; ++y) {
 		for (int32_t x = dst_rect.a.x; x < dst_rect.b.x; ++x) {
-			const Point p = { x, y };
+			const Point<int32_t> p = { x, y };
 			set_color(dst, p, shader(get_color(dst, p), color));
 		}
 	}
@@ -605,7 +605,7 @@ void cc0::gfx::draw_line(cc0::gfx::Image &pDst, int32_t pX1, int32_t pY1, cc0::g
 	if (xdiff == 0.0f && ydiff == 0.0f) {
 		if (pX1 >= 0 && pX1 < pDst.width && pY1 >= 0 && pY1 < pDst.height) {
 			RGBA32 color = { (uint8_t)r1, (uint8_t)g1, (uint8_t)b1, (uint8_t)a1 };
-			set_color(pDst, Point{ pX1, pY1 }, shader(get_color(pDst, Point{ pX1, pY1 }), color));
+			set_color(pDst, Point<int32_t>{ pX1, pY1 }, shader(get_color(pDst, Point<int32_t>{ pX1, pY1 }), color));
 		}
 		return;
 	}
@@ -638,7 +638,7 @@ void cc0::gfx::draw_line(cc0::gfx::Image &pDst, int32_t pX1, int32_t pY1, cc0::g
 				(uint8_t)(b1 + ((b2 - b1) * ((x - pX1) / xdiff))),
 				(uint8_t)(a1 + ((a2 - a1) * ((x - pX1) / xdiff)))
 			};
-			const Point p = { (int32_t)x, (int32_t)y };
+			const Point<int32_t> p = { (int32_t)x, (int32_t)y };
 			set_color(pDst, p, shader(get_color(pDst, p), color));
 		}
 	} else {
@@ -669,22 +669,22 @@ void cc0::gfx::draw_line(cc0::gfx::Image &pDst, int32_t pX1, int32_t pY1, cc0::g
 				(uint8_t)(b1 + ((b2 - b1) * ((y - pY1) / ydiff))),
 				(uint8_t)(a1 + ((a2 - a1) * ((y - pY1) / ydiff)))
 			};
-			const Point p = { (int32_t)x, (int32_t)y };
+			const Point<int32_t> p = { (int32_t)x, (int32_t)y };
 			set_color(pDst, p, shader(get_color(pDst, p), color));
 		}
 	}
 }
 
-void cc0::gfx::stretch_image(cc0::gfx::Image &dst, cc0::gfx::Rect dst_rect, const cc0::gfx::Image &src, cc0::gfx::Rect src_rect, cc0::gfx::Rect write_rect)
+void cc0::gfx::stretch_image(cc0::gfx::Image &dst, cc0::gfx::Rect<int32_t> dst_rect, const cc0::gfx::Image &src, cc0::gfx::Rect<int32_t> src_rect, cc0::gfx::Rect<int32_t> write_rect)
 {
-	write_rect = internal::clip(internal::order(write_rect), Rect{ Point{ 0, 0 }, Point{ dst.width, dst.height } });
+	write_rect = internal::clip(internal::order(write_rect), Rect<int32_t>{ Point<int32_t>{ 0, 0 }, Point<int32_t>{ dst.width, dst.height } });
 
 	if (src_rect.a.x == src_rect.b.x) { return; }
 	if (src_rect.a.y == src_rect.b.y) { return; }
 	if (dst_rect.a.x == dst_rect.b.x) { return; }
 	if (dst_rect.a.y == dst_rect.b.y) { return; }
 
-	src_rect = internal::clip(src_rect, Rect{ Point{ 0, 0 }, Point{ src.width, src.height } });
+	src_rect = internal::clip(src_rect, Rect<int32_t>{ Point<int32_t>{ 0, 0 }, Point<int32_t>{ src.width, src.height } });
 
 	if (dst_rect.a.x > dst_rect.b.x) {
 		internal::swap(dst_rect.a.x, dst_rect.b.x);
@@ -723,10 +723,10 @@ void cc0::gfx::stretch_image(cc0::gfx::Image &dst, cc0::gfx::Rect dst_rect, cons
 		for (int32_t dx = dst_rect.a.x, sx = 0; dx < dst_rect.b.x; ++dx, sx += dsx) {
 			set_color(
 				dst,
-				Point{ dx, dy },
+				Point<int32_t>{ dx, dy },
 				get_color(
 					src,
-					Point{
+					Point<int32_t>{
 						(ssx + sx) >> 15,
 						(ssy + sy) >> 15
 					}
@@ -736,18 +736,18 @@ void cc0::gfx::stretch_image(cc0::gfx::Image &dst, cc0::gfx::Rect dst_rect, cons
 	}
 }
 
-void cc0::gfx::stretch_image(Image &dst, Rect dst_rect, const Image &src, Shader shader, Sampler sampler, Rect src_rect, Rect write_rect)
+void cc0::gfx::stretch_image(Image &dst, Rect<int32_t> dst_rect, const Image &src, Shader shader, Sampler sampler, Rect<int32_t> src_rect, Rect<int32_t> write_rect)
 {
 	// [ ] We probably need to interpolate normalized texture coordinates because bilinear needs to interpolate 0 - width-1, while nearest needs to interpolate 0 - width.
 
-	write_rect = internal::clip(internal::order(write_rect), Rect{ Point{ 0, 0 }, Point{ dst.width, dst.height } });
+	write_rect = internal::clip(internal::order(write_rect), Rect<int32_t>{ Point<int32_t>{ 0, 0 }, Point<int32_t>{ dst.width, dst.height } });
 
 	if (src_rect.a.x == src_rect.b.x) { return; }
 	if (src_rect.a.y == src_rect.b.y) { return; }
 	if (dst_rect.a.x == dst_rect.b.x) { return; }
 	if (dst_rect.a.y == dst_rect.b.y) { return; }
 
-	src_rect = internal::clip(src_rect, Rect{ Point{ 0, 0 }, Point{ src.width, src.height } });
+	src_rect = internal::clip(src_rect, Rect<int32_t>{ Point<int32_t>{ 0, 0 }, Point<int32_t>{ src.width, src.height } });
 
 	if (dst_rect.a.x > dst_rect.b.x) {
 		internal::swap(dst_rect.a.x, dst_rect.b.x);
@@ -786,9 +786,9 @@ void cc0::gfx::stretch_image(Image &dst, Rect dst_rect, const Image &src, Shader
 		for (int32_t dx = dst_rect.a.x, sx = 0; dx < dst_rect.b.x; ++dx, sx += dsx) {
 			set_color(
 				dst,
-				Point{ dx, dy },
+				Point<int32_t>{ dx, dy },
 				shader(
-					get_color(dst, Point{ dx, dy }),
+					get_color(dst, Point<int32_t>{ dx, dy }),
 					sampler(src, ssx + sx, ssy + sy)
 				)
 			);
@@ -798,9 +798,9 @@ void cc0::gfx::stretch_image(Image &dst, Rect dst_rect, const Image &src, Shader
 
 #define arr(X) ((int32_t*)(&(X)))
 
-void cc0::gfx::fill_span(cc0::gfx::Image &dst, int32_t dst_axis, cc0::gfx::Span dst_span, cc0::gfx::RGBA32 color, cc0::gfx::Shader shader, cc0::gfx::Rect write_rect)
+void cc0::gfx::fill_span(cc0::gfx::Image &dst, int32_t dst_axis, cc0::gfx::Span<int32_t> dst_span, cc0::gfx::RGBA32 color, cc0::gfx::Shader shader, cc0::gfx::Rect<int32_t> write_rect)
 {
-	write_rect = internal::clip(internal::order(write_rect), Rect{ Point{ 0, 0 }, Point{ dst.width, dst.height } });
+	write_rect = internal::clip(internal::order(write_rect), Rect<int32_t>{ Point<int32_t>{ 0, 0 }, Point<int32_t>{ dst.width, dst.height } });
 
 	const int32_t fixed_axis = (dst_span.axis + 1) & 1;
 	const int32_t float_axis = dst_span.axis & 1;
@@ -811,7 +811,7 @@ void cc0::gfx::fill_span(cc0::gfx::Image &dst, int32_t dst_axis, cc0::gfx::Span 
 	dst_span.a = internal::max(dst_span.a, arr(write_rect.a)[float_axis]);
 	dst_span.b = internal::min(dst_span.b, arr(write_rect.b)[float_axis]);
 
-	Point p = {
+	Point<int32_t> p = {
 		fixed_axis == 0 ? dst_axis : dst_span.a,
 		fixed_axis == 0 ? dst_span.a : dst_axis
 	};
@@ -820,9 +820,9 @@ void cc0::gfx::fill_span(cc0::gfx::Image &dst, int32_t dst_axis, cc0::gfx::Span 
 	}
 }
 
-void cc0::gfx::stretch_span(cc0::gfx::Image &dst, int32_t dst_axis, cc0::gfx::Span dst_span, const cc0::gfx::Image &src, cc0::gfx::Shader shader, cc0::gfx::Sampler sampler, int32_t src_axis, cc0::gfx::Span src_span, cc0::gfx::Rect write_rect)
+void cc0::gfx::stretch_span(cc0::gfx::Image &dst, int32_t dst_axis, cc0::gfx::Span<int32_t> dst_span, const cc0::gfx::Image &src, cc0::gfx::Shader shader, cc0::gfx::Sampler sampler, int32_t src_axis, cc0::gfx::Span<int32_t> src_span, cc0::gfx::Rect<int32_t> write_rect)
 {
-	write_rect = internal::clip(internal::order(write_rect), Rect{ Point{ 0, 0 }, Point{ dst.width, dst.height } });
+	write_rect = internal::clip(internal::order(write_rect), Rect<int32_t>{ Point<int32_t>{ 0, 0 }, Point<int32_t>{ dst.width, dst.height } });
 
 	const int32_t d_fixed_axis = (dst_span.axis + 1) & 1;
 	const int32_t d_float_axis = dst_span.axis & 1;
@@ -839,7 +839,7 @@ void cc0::gfx::stretch_span(cc0::gfx::Image &dst, int32_t dst_axis, cc0::gfx::Sp
 
 	const int32_t dss = ((src_span.b - src_span.a) << 15) / (dst_span.b - dst_span.a);
 	
-	Point s = {
+	Point<int32_t> s = {
 		(s_fixed_axis == 0 ? src_axis : src_span.a) << 15,
 		(s_fixed_axis == 0 ? src_span.a : src_axis) << 15
 	};
@@ -850,7 +850,7 @@ void cc0::gfx::stretch_span(cc0::gfx::Image &dst, int32_t dst_axis, cc0::gfx::Sp
 	}
 	dst_span.b = internal::min(dst_span.b, write_rect.b.y);
 
-	Point p = {
+	Point<int32_t> p = {
 		d_fixed_axis == 0 ? dst_axis : dst_span.a,
 		d_fixed_axis == 0 ? dst_span.a : dst_axis
 	};
@@ -859,9 +859,9 @@ void cc0::gfx::stretch_span(cc0::gfx::Image &dst, int32_t dst_axis, cc0::gfx::Sp
 	}
 }
 
-void cc0::gfx::stretch_span(cc0::gfx::Image &dst, int32_t dst_axis, cc0::gfx::Span dst_span, const cc0::gfx::Image &src, cc0::gfx::Shader shader, cc0::gfx::Sampler sampler, cc0::gfx::Line src_line, cc0::gfx::Rect write_rect)
+void cc0::gfx::stretch_span(cc0::gfx::Image &dst, int32_t dst_axis, cc0::gfx::Span<int32_t> dst_span, const cc0::gfx::Image &src, cc0::gfx::Shader shader, cc0::gfx::Sampler sampler, cc0::gfx::Line<fixed32_t> src_line, cc0::gfx::Rect<int32_t> write_rect)
 {
-	write_rect = internal::clip(internal::order(write_rect), Rect{ Point{ 0, 0 }, Point{ dst.width, dst.height } });
+	write_rect = internal::clip(internal::order(write_rect), Rect<int32_t>{ Point<int32_t>{ 0, 0 }, Point<int32_t>{ dst.width, dst.height } });
 
 	const int32_t fixed_axis = (dst_span.axis + 1) & 1;
 	const int32_t float_axis = dst_span.axis & 1;
@@ -876,7 +876,7 @@ void cc0::gfx::stretch_span(cc0::gfx::Image &dst, int32_t dst_axis, cc0::gfx::Sp
 	const int32_t dsx = ((src_line.b.x - src_line.a.x) << 15) / (dst_span.b - dst_span.a);
 	const int32_t dsy = ((src_line.b.y - src_line.a.y) << 15) / (dst_span.b - dst_span.a);
 	
-	Point s = {
+	Point<int32_t> s = {
 		src_line.a.x.x,
 		src_line.a.y.x
 	};
@@ -888,7 +888,7 @@ void cc0::gfx::stretch_span(cc0::gfx::Image &dst, int32_t dst_axis, cc0::gfx::Sp
 	}
 	dst_span.b = internal::min(dst_span.b, write_rect.b.y);
 
-	Point p = {
+	Point<int32_t> p = {
 		fixed_axis == 0 ? dst_axis : dst_span.a,
 		fixed_axis == 0 ? dst_span.a : dst_axis
 	};
@@ -899,7 +899,7 @@ void cc0::gfx::stretch_span(cc0::gfx::Image &dst, int32_t dst_axis, cc0::gfx::Sp
 
 #undef arr
 
-int32_t cc0::gfx::print_text(cc0::gfx::Image &dst, cc0::gfx::Point p, const char *text, int32_t text_len, cc0::gfx::RGBA32 color, int32_t scale, cc0::gfx::Rect write_rect)
+int32_t cc0::gfx::print_text(cc0::gfx::Image &dst, cc0::gfx::Point<int32_t> p, const char *text, int32_t text_len, cc0::gfx::RGBA32 color, int32_t scale, cc0::gfx::Rect<int32_t> write_rect)
 {
 	if (scale <= 0) { return p.x; }
 
@@ -908,14 +908,14 @@ int32_t cc0::gfx::print_text(cc0::gfx::Image &dst, cc0::gfx::Point p, const char
 		FONT_ATLAS_CHAR_WIDTH_COUNT * FONT_CELL_PX_WIDTH, FONT_ATLAS_CHAR_HEIGHT_COUNT * FONT_CELL_PX_HEIGHT,
 		encode_1bpp, decode_1bpp, index_linear
 	);
-	const int32_t CHAR_DST_WIDTH  = FONT_CHAR_PX_WIDTH * scale;
+	const int32_t CHAR_DST_WIDTH  = FONT_CHAR_PX_WIDTH  * scale;
 	const int32_t CHAR_DST_HEIGHT = FONT_CHAR_PX_HEIGHT * scale;
 	for (int32_t i = 0; i < text_len && text[i] != 0 && p.x < write_rect.b.x; ++i, p.x += CHAR_DST_WIDTH) {
 		if (text[i] != ' ') {
 			const int32_t sy = FONT_CELL_PX_HEIGHT * ((int32_t)text[i] - FONT_CHAR_ASCII_START);
 			stretch_image(
-				dst, Rect{ Point{ p.x, p.y }, Point{ p.x + CHAR_DST_WIDTH, p.y + CHAR_DST_HEIGHT } },
-				src, shade_stencil, sample_nearest, Rect{ Point{ 0, sy }, Point{ FONT_CELL_PX_WIDTH, sy + FONT_CELL_PX_HEIGHT } },
+				dst, Rect<int32_t>{ Point<int32_t>{ p.x, p.y }, Point<int32_t>{ p.x + CHAR_DST_WIDTH, p.y + CHAR_DST_HEIGHT } },
+				src, shade_stencil, sample_nearest, Rect<int32_t>{ Point<int32_t>{ 0, sy }, Point<int32_t>{ FONT_CELL_PX_WIDTH, sy + FONT_CELL_PX_HEIGHT } },
 				write_rect
 			);
 		}
@@ -1049,9 +1049,9 @@ int32_t cc0::gfx::print_text(cc0::gfx::Image &dst, cc0::gfx::Point p, const char
 	}
 }*/
 
-void cc0::gfx::fill_tri(cc0::gfx::Image &dst, cc0::gfx::Point a, cc0::gfx::Point b, cc0::gfx::Point c, cc0::gfx::RGBA32 color, cc0::gfx::Shader shader, cc0::gfx::Rect write_rect)
+void cc0::gfx::fill_tri(cc0::gfx::Image &dst, cc0::gfx::Point<int32_t> a, cc0::gfx::Point<int32_t> b, cc0::gfx::Point<int32_t> c, cc0::gfx::RGBA32 color, cc0::gfx::Shader shader, cc0::gfx::Rect<int32_t> write_rect)
 {
-	write_rect = internal::clip(internal::order(write_rect), Rect{ Point{ 0, 0 }, Point{ dst.width, dst.height } });
+	write_rect = internal::clip(internal::order(write_rect), Rect<int32_t>{ Point<int32_t>{ 0, 0 }, Point<int32_t>{ dst.width, dst.height } });
 
 	// AABB Clipping
 	const int32_t min_y = internal::max(internal::min(a.y, b.y, c.y), write_rect.a.y);
@@ -1062,10 +1062,10 @@ void cc0::gfx::fill_tri(cc0::gfx::Image &dst, cc0::gfx::Point a, cc0::gfx::Point
 	if (max_x - min_x <= 0) { return; }
 
 	// Triangle setup
-	Point   p    = { min_x, min_y };
-	int64_t w0_y = internal::determine_halfspace(b, c, p) + (int64_t(internal::is_top_left(b, c)) - 1);
-	int64_t w1_y = internal::determine_halfspace(c, a, p) + (int64_t(internal::is_top_left(c, a)) - 1);
-	int64_t w2_y = internal::determine_halfspace(a, b, p) + (int64_t(internal::is_top_left(a, b)) - 1);
+	Point<int32_t> p    = { min_x, min_y };
+	int64_t        w0_y = internal::determine_halfspace(b, c, p) + (int64_t(internal::is_top_left(b, c)) - 1);
+	int64_t        w1_y = internal::determine_halfspace(c, a, p) + (int64_t(internal::is_top_left(c, a)) - 1);
+	int64_t        w2_y = internal::determine_halfspace(a, b, p) + (int64_t(internal::is_top_left(a, b)) - 1);
 
 	// Interpolation/triangle setup
 	const int32_t w2_x_inc = a.y - b.y;

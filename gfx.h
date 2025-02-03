@@ -51,32 +51,63 @@ namespace cc0
 			};
 		}
 
+		/// @brief A real number with a fixed number of bits dedicated for decimals.
+		/// @tparam bits The total number of bits for the base data type. Supported sizes are 8, 16, 32, and 64.
+		/// @tparam precision The number of bits dedicated to decimals.
+		/// @note 64 bits for base type might very easily lead to overflow when multiplying.
 		template < uint32_t bits, uint32_t precision >
 		struct fixed
 		{
-			typename internal::intinfo<bits>::int_t x;
+			typename internal::intinfo<bits>::int_t x; // The binary representation of the fixed-point number.
 
-			fixed() = default;
+			/// @brief The default constructor. Does nothing, and does not initialize the instance.
+			fixed( void ) = default;
+			
+			/// @brief The copy constructor.
+			/// @param NA The instance to copy.
 			fixed(const fixed&) = default;
+			
+			/// @brief The copy operator.
+			/// @param NA The instance to copy.
+			/// @return The result.
 			fixed &operator=(const fixed&) = default;
 
+			/// @brief A conversion constructor that converts an integer into a fixed-point number by upscaling it.
+			/// @param n The number to upscale into a fixed-point number.
 			fixed(typename internal::intinfo<bits>::int_t n) : x(n << precision) {}
+
+			/// @brief A conversion operator converting the fixed-point number into an integer by downscaling it.
 			operator typename internal::intinfo<bits>::int_t( void ) { return x >> precision; }
 
+			/// @brief Addition.
+			/// @param r The right-hand side operator.
+			/// @return The result.
 			fixed &operator+=(fixed r) { x += r.x; return *this; }
+
+			/// @brief Subtraction.
+			/// @param r The right-hand side operator.
+			/// @return The result.
 			fixed &operator-=(fixed r) { x -= r.x; return *this; }
+			
+			/// @brief Multiplication.
+			/// @param r The right-hand side operator.
+			/// @return The result.
 			fixed &operator*=(fixed r) {
 				typename internal::intinfo<bits>::next::int_t n = typename internal::intinfo<bits>::next::int_t(x) * r.x;
 				x = (n.x >> precision);
 				return *this;
 			}
+
+			/// @brief Division.
+			/// @param r The right-hand side operator.
+			/// @return The result.
 			fixed &operator/=(fixed r) {
 				x = (typename internal::intinfo<bits>::next::int_t(x) << precision) / r.x;
 				return *this;
 			}
 		};
 
-		typedef fixed<32,15> fixed32_t;
+		typedef fixed<32,15> fixed32_t; // The most commonly used fixed-point number format.
 
 		/// @brief Color separated as channels.
 		struct RGBA32
@@ -97,72 +128,69 @@ namespace cc0
 		static const RGBA32 COLOR_YELLOW  = { 255, 255, 0, 255 };   // Yellow.
 		static const RGBA32 COLOR_GRAY    = { 127, 127, 127, 255 }; // Gray.
 
-		/// @brief A point with integer coordinates.
+		/// @brief A point.
+		template < typename type_t >
 		struct Point
 		{
-			int32_t x; // The X coordinate.
-			int32_t y; // The Y coordinate.
-		};
-
-		/// @brief A point with real coordinates.
-		struct Coord
-		{
-			fixed32_t x; // The X coordinate.
-			fixed32_t y; // The Y coordinate.
+			type_t x; // The X coordinate.
+			type_t y; // The Y coordinate.
 		};
 
 		/// @brief A rectangle.
+		template < typename type_t >
 		struct Rect
 		{
-			Point a; // A point.
-			Point b; // The diagonally adjacent point.
+			Point<type_t> a; // A point.
+			Point<type_t> b; // The diagonally adjacent point.
 		};
 
 		/// @brief A span.
+		template < typename type_t >
 		struct Span
 		{
-			int32_t a;    // An endpoint on the span.
-			int32_t b;    // An endpoint on the span.
+			type_t  a;    // An endpoint on the span.
+			type_t  b;    // An endpoint on the span.
 			int32_t axis; // The axis. 0 for X, 1 for Y.
 		};
 
 		/// @brief A line.
+		template < typename type_t >
 		struct Line
 		{
-			Coord a; // An endpoint on the line.
-			Coord b; // An endpoint on the line.
+			Point<type_t> a; // An endpoint on the line.
+			Point<type_t> b; // An endpoint on the line.
 		};
 		
 		struct Image;
 
 		/// @brief Maps a 2D coordinate to a 1D pixel coordinate.
-		typedef int32_t (*Indexer)(const Image&, Point);
+		typedef int32_t (*Indexer)(const Image&, Point<int32_t>);
 
 		/// @brief Converts 2D coordinates into a 1D pixel coordinate. Assumes the pixels in a source image are stored left to right, and in such that the last pixel of the previous row directly precedes the first pixel in the current row.
 		/// @param src The source image.
 		/// @param p The X,Y coordinate.
 		/// @return The 1D index accessing the requested pixel at the given coordinates in the source image.
 		/// @note The output coordinate is the pixel coordinate, not the index of a byte in the pixel array of the source image. The difference is that under this scheme you can address individual bits in the pixel array for times where pixels do not neatly line up with byte boundaries, for instance when pixels are less than one byte large.
-		int32_t index_linear(const Image &src, Point p);
+		int32_t index_linear(const Image &src, Point<int32_t> p);
 
 		/// @brief Converts 2D coordinates into a 1D pixel coordinate. Assumes the pixels in a source image are stored left to right, and in such that the last pixel of the previous row directly precedes the first pixel in the current row. When accessing outside the area of the source image, the coordinates wrap around.
 		/// @param src The source image.
 		/// @param p The X,Y coordinate.
 		/// @return The 1D index accessing the requested pixel at the given coordinates in the source image.
 		/// @note The output coordinate is the pixel coordinate, not the index of a byte in the pixel array of the source image. The difference is that under this scheme you can address individual bits in the pixel array for times where pixels do not neatly line up with byte boundaries, for instance when pixels are less than one byte large.
-		int32_t index_repeat_linear(const Image &src, Point p);
+		int32_t index_repeat_linear(const Image &src, Point<int32_t> p);
 
 		/// @brief Converts 2D coordinates into a 1D pixel coordinate. Assumes the pixels in a source image are stored in Z/Morton order (a recursive Z pattern).
 		/// @param p The X,Y coordinate.
 		/// @return The 1D index accessing the requested pixel at the given coordinates in the source image.
 		/// @note The output coordinate is the pixel coordinate, not the index of a byte in the pixel array of the source image. The difference is that under this scheme you can address individual bits in the pixel array for times where pixels do not neatly line up with byte boundaries, for instance when pixels are less than one byte large.
-		int32_t index_z(const Image&, Point p);
+		int32_t index_z(const Image&, Point<int32_t> p);
 
 		/// @brief Converts 2D coordinates into a 1D pixel coordinate. Assumes the pixels in a source image are stored in Z/Morton order (a recursive Z pattern). When accessing outside the area of the source image, the coordinates wrap around.
 		/// @param p The X,Y coordinate.
 		/// @return The 1D index accessing the requested pixel at the given coordinates in the source image.
 		/// @note The output coordinate is the pixel coordinate, not the index of a byte in the pixel array of the source image. The difference is that under this scheme you can address individual bits in the pixel array for times where pixels do not neatly line up with byte boundaries, for instance when pixels are less than one byte large.
-		int32_t index_repeat_z(const Image&, Point p);
+		int32_t index_repeat_z(const Image&, Point<int32_t> p);
 
 		/// @brief Decodes a single pixel in RGBA16 format into RGBA32 format.
 		/// @param pixel The pixel pointer pointing to the start of the pixel.
@@ -275,142 +303,142 @@ namespace cc0
 		void encode_1bpp(uint8_t color, void *out, int32_t i);
 
 		/// @brief Decodes a pixel pointer parameter into a color and returns it.
-		typedef RGBA32 (*Decoder)(const Image&, Point);
+		typedef RGBA32 (*Decoder)(const Image&, Point<int32_t>);
 
 		/// @brief Decodes a single pixel in RGBA16 format into RGBA32 format.
 		/// @param src The source image to pick a pixel from.
 		/// @param p The X,Y coordinate of the pixel.
 		/// @return The decoded RGBA32.
-		RGBA32 decode_RGBA16(const Image &src, Point p);
+		RGBA32 decode_RGBA16(const Image &src, Point<int32_t> p);
 
 		/// @brief Decodes a single pixel in RGB24 format into RGBA32 format.
 		/// @param src The source image to pick a pixel from.
 		/// @param p The X,Y coordinate of the pixel.
 		/// @return The decoded RGBA32.
-		RGBA32 decode_RGB24(const Image &src, Point p);
+		RGBA32 decode_RGB24(const Image &src, Point<int32_t> p);
 
 		/// @brief Decodes a single pixel in RGBA32 format into RGBA32 format.
 		/// @param src The source image to pick a pixel from.
 		/// @param p The X,Y coordinate of the pixel.
 		/// @return The decoded RGBA32.
-		RGBA32 decode_RGBA32(const Image &src, Point p);
+		RGBA32 decode_RGBA32(const Image &src, Point<int32_t> p);
 
 		/// @brief Decodes a single pixel in BGRA16 format into RGBA32 format.
 		/// @param src The source image to pick a pixel from.
 		/// @param p The X,Y coordinate of the pixel.
 		/// @return The decoded RGBA32.
-		RGBA32 decode_BGRA16(const Image &src, Point p);
+		RGBA32 decode_BGRA16(const Image &src, Point<int32_t> p);
 
 		/// @brief Decodes a single pixel in BGR24 format into RGBA32 format.
 		/// @param src The source image to pick a pixel from.
 		/// @param p The X,Y coordinate of the pixel.
 		/// @return The decoded RGBA32.
-		RGBA32 decode_BGR24(const Image &src, Point p);
+		RGBA32 decode_BGR24(const Image &src, Point<int32_t> p);
 
 		/// @brief Decodes a single pixel in BGRA32 format into RGBA32 format.
 		/// @param src The source image to pick a pixel from.
 		/// @param p The X,Y coordinate of the pixel.
 		/// @return The decoded RGBA32.
-		RGBA32 decode_BGRA32(const Image &src, Point p);
+		RGBA32 decode_BGRA32(const Image &src, Point<int32_t> p);
 
 		/// @brief Decodes a single pixel in ARGB16 format into RGBA32 format.
 		/// @param src The source image to pick a pixel from.
 		/// @param p The X,Y coordinate of the pixel.
 		/// @return The decoded RGBA32.
-		RGBA32 decode_ARGB16(const Image &src, Point p);
+		RGBA32 decode_ARGB16(const Image &src, Point<int32_t> p);
 
 		/// @brief Decodes a single pixel in ARGB32 format into RGBA32 format.
 		/// @param src The source image to pick a pixel from.
 		/// @param p The X,Y coordinate of the pixel.
 		/// @return The decoded RGBA32.
-		RGBA32 decode_ARGB32(const Image &src, Point p);
+		RGBA32 decode_ARGB32(const Image &src, Point<int32_t> p);
 
 		/// @brief Decodes a single pixel in ABGR16 format into RGBA32 format.
 		/// @param src The source image to pick a pixel from.
 		/// @param p The X,Y coordinate of the pixel.
 		/// @return The decoded RGBA32.
-		RGBA32 decode_ABGR16(const Image &src, Point p);
+		RGBA32 decode_ABGR16(const Image &src, Point<int32_t> p);
 
 		/// @brief Decodes a single pixel in ABGR32 format into RGBA32 format.
 		/// @param src The source image to pick a pixel from.
 		/// @param p The X,Y coordinate of the pixel.
 		/// @return The decoded RGBA32.
-		RGBA32 decode_ABGR32(const Image &src, Point p);
+		RGBA32 decode_ABGR32(const Image &src, Point<int32_t> p);
 
 		/// @brief Decodes a single pixel in 1bpp format into RGBA32 format.
 		/// @param src The source image to pick a pixel from.
 		/// @param p The X,Y coordinate of the pixel.
 		/// @return The decoded RGBA32.
-		RGBA32 decode_1bpp(const Image &src, Point p);
+		RGBA32 decode_1bpp(const Image &src, Point<int32_t> p);
 
 		/// @brief Encodes a color into the pixel pointer parameter.
-		typedef void (*Encoder)(Image&, Point, RGBA32);
+		typedef void (*Encoder)(Image&, Point<int32_t>, RGBA32);
 
 		/// @brief Encodes a RGBA32 color format into RGBA16 format and stores it in an image.
 		/// @param dst The destination image to store the encoded pixel in.
 		/// @param p The X,Y coordinate of the pixel.
 		/// @param color The color to encode.
-		void encode_RGBA16(Image &dst, Point p, RGBA32 color);
+		void encode_RGBA16(Image &dst, Point<int32_t> p, RGBA32 color);
 
 		/// @brief Encodes a RGBA32 color format into RGB24 format and stores it in an image.
 		/// @param dst The destination image to store the encoded pixel in.
 		/// @param p The X,Y coordinate of the pixel.
 		/// @param color The color to encode.
-		void encode_RGB24(Image &dst, Point p, RGBA32 color);
+		void encode_RGB24(Image &dst, Point<int32_t> p, RGBA32 color);
 
 		/// @brief Encodes a RGBA32 color format into RGBA32 format and stores it in an image.
 		/// @param dst The destination image to store the encoded pixel in.
 		/// @param p The X,Y coordinate of the pixel.
 		/// @param color The color to encode.
-		void encode_RGBA32(Image &dst, Point p, RGBA32 color);
+		void encode_RGBA32(Image &dst, Point<int32_t> p, RGBA32 color);
 
 		/// @brief Encodes a RGBA32 color format into BGRA16 format and stores it in an image.
 		/// @param dst The destination image to store the encoded pixel in.
 		/// @param p The X,Y coordinate of the pixel.
 		/// @param color The color to encode.
-		void encode_BGRA16(Image &dst, Point p, RGBA32 color);
+		void encode_BGRA16(Image &dst, Point<int32_t> p, RGBA32 color);
 
 		/// @brief Encodes a RGBA32 color format into RGB24 format and stores it in an image.
 		/// @param dst The destination image to store the encoded pixel in.
 		/// @param p The X,Y coordinate of the pixel.
 		/// @param color The color to encode.
-		void encode_BGR24(Image &dst, Point p, RGBA32 color);
+		void encode_BGR24(Image &dst, Point<int32_t> p, RGBA32 color);
 
 		/// @brief Encodes a RGBA32 color format into BGRA32 format and stores it in an image.
 		/// @param dst The destination image to store the encoded pixel in.
 		/// @param p The X,Y coordinate of the pixel.
 		/// @param color The color to encode.
-		void encode_BGRA32(Image &dst, Point p, RGBA32 color);
+		void encode_BGRA32(Image &dst, Point<int32_t> p, RGBA32 color);
 
 		/// @brief Encodes a RGBA32 color format into ARGB16 format and stores it in an image.
 		/// @param dst The destination image to store the encoded pixel in.
 		/// @param p The X,Y coordinate of the pixel.
 		/// @param color The color to encode.
-		void encode_ARGB16(Image &dst, Point p, RGBA32 color);
+		void encode_ARGB16(Image &dst, Point<int32_t> p, RGBA32 color);
 
 		/// @brief Encodes a RGBA32 color format into ARGB32 format and stores it in an image.
 		/// @param dst The destination image to store the encoded pixel in.
 		/// @param p The X,Y coordinate of the pixel.
 		/// @param color The color to encode.
-		void encode_ARGB32(Image &dst, Point p, RGBA32 color);
+		void encode_ARGB32(Image &dst, Point<int32_t> p, RGBA32 color);
 
 		/// @brief Encodes a RGBA32 color format into ABGR16 format and stores it in an image.
 		/// @param dst The destination image to store the encoded pixel in.
 		/// @param p The X,Y coordinate of the pixel.
 		/// @param color The color to encode.
-		void encode_ABGR16(Image &dst, Point p, RGBA32 color);
+		void encode_ABGR16(Image &dst, Point<int32_t> p, RGBA32 color);
 
 		/// @brief Encodes a RGBA32 color format into ABGR32 format and stores it in an image.
 		/// @param dst The destination image to store the encoded pixel in.
 		/// @param p The X,Y coordinate of the pixel.
 		/// @param color The color to encode.
-		void encode_ABGR32(Image &dst, Point p, RGBA32 color);
+		void encode_ABGR32(Image &dst, Point<int32_t> p, RGBA32 color);
 
 		/// @brief Encodes a RGBA32 color format into 1bpp format and stores it in an image.
 		/// @param dst The destination image to store the encoded pixel in.
 		/// @param p The X,Y coordinate of the pixel.
 		/// @param color The color to encode.
-		void encode_1bpp(Image &dst, Point p, RGBA32 color);
+		void encode_1bpp(Image &dst, Point<int32_t> p, RGBA32 color);
 
 		/// @brief Blends a source color and a destination color and returns the result.
 		typedef RGBA32 (*Shader)(RGBA32, RGBA32);
@@ -501,17 +529,17 @@ namespace cc0
 		/// @param src The image to get the color from.
 		/// @param p The X,Y coordinate to get the color from.
 		/// @return The color at the given coordinate.
-		RGBA32 get_color(const Image &src, Point p);
+		RGBA32 get_color(const Image &src, Point<int32_t> p);
 
 		/// @brief Sets the color of a pixel at a given integer coordinate of an image.
 		/// @param dst The image to set the color to.
 		/// @param p The X,Y coordinate of the color to set.
 		/// @param c The color.
-		void set_color(Image &dst, Point p, RGBA32 c);
+		void set_color(Image &dst, Point<int32_t> p, RGBA32 c);
 
-		const Rect FULL_RECT = Rect{ Point{0,0}, Point{Image::MAX_DIMENSION, Image::MAX_DIMENSION} }; // The maximum (unsigned) rectangle allowed. Can often be used to indicate the maximally allowed region of an image.
+		const Rect<int32_t> FULL_RECT = Rect<int32_t>{ Point<int32_t>{0,0}, Point<int32_t>{Image::MAX_DIMENSION, Image::MAX_DIMENSION} }; // The maximum (unsigned) rectangle allowed. Can often be used to indicate the maximally allowed region of an image.
 
-		const Span FULL_SPAN = Span{ 0, Image::MAX_DIMENSION }; // The maximum (unsigned) span allowed. Can often be used to indicate the maximally allowed region of an image.
+		const Span<int32_t> FULL_SPAN = Span<int32_t>{ 0, Image::MAX_DIMENSION }; // The maximum (unsigned) span allowed. Can often be used to indicate the maximally allowed region of an image.
 
 		/// @brief Fills the specified area with the specified color using the specified shader (normal assignment is default).
 		/// @param dst The destination image.
@@ -519,7 +547,7 @@ namespace cc0
 		/// @param color The input color.
 		/// @param shader The shader to use to blend colors.
 		/// @param write_rect The area on the destination image that is writeable. All rendering outside this area is discarded. The entire destination image is selected by default. The region is automatically clipped to the maximally allowed dimensions on the destination image.
-		void fill_rect(Image &dst, Rect dst_rect, RGBA32 color, Shader shader = shade_set, Rect write_rect = FULL_RECT);
+		void fill_rect(Image &dst, Rect<int32_t> dst_rect, RGBA32 color, Shader shader = shade_set, Rect<int32_t> write_rect = FULL_RECT);
 
 		/// @brief Draws a line between the two specified points using the two specified colors and the specified predicate (normal assignment is default).
 		/// @param pDst The destination image.
@@ -538,7 +566,7 @@ namespace cc0
 		/// @param src The source image.
 		/// @param src_rect The area on the source image to stretch over the selected destination region. The entire source image is selected by default. The region is automatically clipped to the maximally allowed dimensions on the source image.
 		/// @param write_rect The area on the destination image that is writeable. All rendering outside this area is discarded. The entire destination image is selected by default. The region is automatically clipped to the maximally allowed dimensions on the destination image.
-		void stretch_image(Image &dst, Rect dst_rect, const Image &src, Rect src_rect = FULL_RECT, Rect write_rect = FULL_RECT);
+		void stretch_image(Image &dst, Rect<int32_t> dst_rect, const Image &src, Rect<int32_t> src_rect = FULL_RECT, Rect<int32_t> write_rect = FULL_RECT);
 
 		/// @brief Stretches a portion of a source image over the portion of a destination image.
 		/// @param dst The destination image.
@@ -548,7 +576,7 @@ namespace cc0
 		/// @param sampler The sampler to use on the source image to sample colors.
 		/// @param src_rect The area on the source image to stretch over the selected destination region. The entire source image is selected by default. The region is automatically clipped to the maximally allowed dimensions on the source image.
 		/// @param write_rect The area on the destination image that is writeable. All rendering outside this area is discarded. The entire destination image is selected by default. The region is automatically clipped to the maximally allowed dimensions on the destination image.
-		void stretch_image(Image &dst, Rect dst_rect, const Image &src, Shader shader, Sampler sampler, Rect src_rect = FULL_RECT, Rect write_rect = FULL_RECT);
+		void stretch_image(Image &dst, Rect<int32_t> dst_rect, const Image &src, Shader shader, Sampler sampler, Rect<int32_t> src_rect = FULL_RECT, Rect<int32_t> write_rect = FULL_RECT);
 
 		/// @brief Draws an axis-aligned span on the destination image.
 		/// @param dst The destination image.
@@ -557,7 +585,7 @@ namespace cc0
 		/// @param color The color.
 		/// @param shader The shader to use to blend colors (defaults to assignment).
 		/// @param write_rect The area on the destination image that is writeable. All rendering outside this area is discarded. The entire destination image is selected by default. The region is automatically clipped to the maximally allowed dimensions on the destination image.
-		void fill_span(Image &dst, int32_t dst_axis, Span dst_span, RGBA32 color, Shader shader = shade_set, Rect write_rect = FULL_RECT);
+		void fill_span(Image &dst, int32_t dst_axis, Span<int32_t> dst_span, RGBA32 color, Shader shader = shade_set, Rect<int32_t> write_rect = FULL_RECT);
 
 		/// @brief Draws an axis-aligned span on the destination image by stretching a region of the source image over a region of the destination image.
 		/// @param dst The destination image.
@@ -569,7 +597,7 @@ namespace cc0
 		/// @param shader The shader to use.
 		/// @param sampler The sampler to use on the source image.
 		/// @param write_rect The area on the destination image that is writeable. All rendering outside this area is discarded. The entire destination image is selected by default. The region is automatically clipped to the maximally allowed dimensions on the destination image.
-		void stretch_span(Image &dst, int32_t dst_axis, Span dst_span, const Image &src, Shader shader, Sampler sampler, int32_t src_axis, Span src_span = FULL_SPAN, Rect write_rect = FULL_RECT);
+		void stretch_span(Image &dst, int32_t dst_axis, Span<int32_t> dst_span, const Image &src, Shader shader, Sampler sampler, int32_t src_axis, Span<int32_t> src_span = FULL_SPAN, Rect<int32_t> write_rect = FULL_RECT);
 
 		/// @brief Draws an axis-aligned span on the destination image by stretching a region of the source image over a region of the destination image.
 		/// @param dst The destination image.
@@ -581,7 +609,7 @@ namespace cc0
 		/// @param shader The shader to use.
 		/// @param sampler The sampler to use on the source image.
 		/// @param write_rect The area on the destination image that is writeable. All rendering outside this area is discarded. The entire destination image is selected by default. The region is automatically clipped to the maximally allowed dimensions on the destination image.
-		void stretch_span(Image &dst, int32_t dst_x, Span dst_span, const Image &src, Shader shader, Sampler sampler, Line src_line, Rect write_rect = FULL_RECT);
+		void stretch_span(Image &dst, int32_t dst_x, Span<int32_t> dst_span, const Image &src, Shader shader, Sampler sampler, Line<fixed32_t> src_line, Rect<int32_t> write_rect = FULL_RECT);
 
 		/// @brief Draws text using the built-in font on the 
 		/// @param dst The target image.
@@ -594,7 +622,7 @@ namespace cc0
 		/// @param write_rect The area on the destination image that is writeable. All rendering outside this area is discarded. The entire destination image is selected by default. The region is automatically clipped to the maximally allowed dimensions on the destination image.
 		/// @return The X coordinate past the last character of the input string.
 		/// @note This uses only a built-in font, but the effect can be replicated using any bitfont using the draw_image function and the 1bpp encoder/decoder functions.
-		int32_t print_text(Image &dst, Point p, const char *text, int32_t text_len, RGBA32 color, int32_t scale = 1, Rect write_rect = FULL_RECT);
+		int32_t print_text(Image &dst, Point<int32_t> p, const char *text, int32_t text_len, RGBA32 color, int32_t scale = 1, Rect<int32_t> write_rect = FULL_RECT);
 
 		/// @brief Fills the specified triangle area with the specified color using the specified shader (normal assignment is default).
 		/// @param dst The destination image.
@@ -604,7 +632,7 @@ namespace cc0
 		/// @param color The input color.
 		/// @param shader The shader to use to blend colors (assignment is default).
 		/// @param write_rect The area on the destination image that is writeable. All rendering outside this area is discarded. The entire destination image is selected by default. The region is automatically clipped to the maximally allowed dimensions on the destination image.
-		void fill_tri(Image &dst, Point a, Point b, Point c, RGBA32 color, Shader shader = shade_set, Rect write_rect = FULL_RECT);
+		void fill_tri(Image &dst, Point<int32_t> a, Point<int32_t> b, Point<int32_t> c, RGBA32 color, Shader shader = shade_set, Rect<int32_t> write_rect = FULL_RECT);
 
 		/// @brief An array of attributes that can be interpolated across a primitive.
 		/// @tparam attr_type The base type of the attributes.
@@ -634,7 +662,7 @@ namespace cc0
 		/// @param shader The shader tp use to blend colors.
 		/// @param write_rect The area on the destination image that is writeable. All rendering outside this area is discarded. The entire destination image is selected by default. The region is automatically clipped to the maximally allowed dimensions on the destination image.
 		template < typename attr_type, uint32_t var_attr_size, typename const_attr_t >
-		void draw_tri(Image &dst, Point a, Point b, Point c, const Attributes<attr_type, var_attr_size> &a_var, const Attributes<attr_type, var_attr_size> &b_var, const Attributes<attr_type, var_attr_size> &c_var, const const_attr_t &consts, AttributeShader<attr_type, var_attr_size, const_attr_t> shader, Rect write_rect = FULL_RECT);
+		void draw_tri(Image &dst, Point<int32_t> a, Point<int32_t> b, Point<int32_t> c, const Attributes<attr_type, var_attr_size> &a_var, const Attributes<attr_type, var_attr_size> &b_var, const Attributes<attr_type, var_attr_size> &c_var, const const_attr_t &consts, AttributeShader<attr_type, var_attr_size, const_attr_t> shader, Rect<int32_t> write_rect = FULL_RECT);
 
 		/// @brief Namespace for internal functions. Do not use these.
 		namespace internal
@@ -657,28 +685,55 @@ namespace cc0
 			template < typename type_t >
 			type_t clamp(type_t min, type_t x, type_t max);
 
-			cc0::gfx::Rect order(cc0::gfx::Rect r);
+			cc0::gfx::Rect<int32_t> order(cc0::gfx::Rect<int32_t> r);
 
-			cc0::gfx::Rect clip(cc0::gfx::Rect a, cc0::gfx::Rect b);
+			cc0::gfx::Rect<int32_t> clip(cc0::gfx::Rect<int32_t> a, cc0::gfx::Rect<int32_t> b);
 
-			uint64_t determine_halfspace(cc0::gfx::Point a, cc0::gfx::Point b, cc0::gfx::Point point);
+			uint64_t determine_halfspace(cc0::gfx::Point<int32_t> a, cc0::gfx::Point<int32_t> b, cc0::gfx::Point<int32_t> point);
 			
-			bool is_top_left(cc0::gfx::Point a, cc0::gfx::Point b);
+			bool is_top_left(cc0::gfx::Point<int32_t> a, cc0::gfx::Point<int32_t> b);
 		}
 	}
 }
 
+/// @brief Addition.
+/// @tparam bits The total number of bits for the base data type. Supported sizes are 8, 16, 32, and 64.
+/// @tparam precision The number of bits dedicated to decimals.
+/// @param l The left-hand side operand.
+/// @param r The right-hand side operand.
+/// @return The result.
 template < uint32_t bits, uint32_t precision > cc0::gfx::fixed<bits,precision> operator+(cc0::gfx::fixed<bits,precision> l, cc0::gfx::fixed<bits,precision> r) { return l += r; }
+
+/// @brief Subtraction.
+/// @tparam bits The total number of bits for the base data type. Supported sizes are 8, 16, 32, and 64.
+/// @tparam precision The number of bits dedicated to decimals.
+/// @param l The left-hand side operand.
+/// @param r The right-hand side operand.
+/// @return The result.
 template < uint32_t bits, uint32_t precision > cc0::gfx::fixed<bits,precision> operator-(cc0::gfx::fixed<bits,precision> l, cc0::gfx::fixed<bits,precision> r) { return l -= r; }
+
+/// @brief Multiplication.
+/// @tparam bits The total number of bits for the base data type. Supported sizes are 8, 16, 32, and 64.
+/// @tparam precision The number of bits dedicated to decimals.
+/// @param l The left-hand side operand.
+/// @param r The right-hand side operand.
+/// @return The result.
 template < uint32_t bits, uint32_t precision > cc0::gfx::fixed<bits,precision> operator*(cc0::gfx::fixed<bits,precision> l, cc0::gfx::fixed<bits,precision> r) { return l *= r; }
+
+/// @brief Division.
+/// @tparam bits The total number of bits for the base data type. Supported sizes are 8, 16, 32, and 64.
+/// @tparam precision The number of bits dedicated to decimals.
+/// @param l The left-hand side operand.
+/// @param r The right-hand side operand.
+/// @return The result.
 template < uint32_t bits, uint32_t precision > cc0::gfx::fixed<bits,precision> operator/(cc0::gfx::fixed<bits,precision> l, cc0::gfx::fixed<bits,precision> r) { return l /= r; }
 
 template < typename attr_type, uint32_t var_attr_size, typename const_attr_t >
-void cc0::gfx::draw_tri(cc0::gfx::Image &dst, cc0::gfx::Point a, cc0::gfx::Point b, cc0::gfx::Point c, const cc0::gfx::Attributes<attr_type, var_attr_size> &a_var, const cc0::gfx::Attributes<attr_type, var_attr_size> &b_var, const cc0::gfx::Attributes<attr_type, var_attr_size> &c_var, const const_attr_t &consts, cc0::gfx::AttributeShader<attr_type, var_attr_size, const_attr_t> shader, cc0::gfx::Rect write_rect)
+void cc0::gfx::draw_tri(cc0::gfx::Image &dst, cc0::gfx::Point<int32_t> a, cc0::gfx::Point<int32_t> b, cc0::gfx::Point<int32_t> c, const cc0::gfx::Attributes<attr_type, var_attr_size> &a_var, const cc0::gfx::Attributes<attr_type, var_attr_size> &b_var, const cc0::gfx::Attributes<attr_type, var_attr_size> &c_var, const const_attr_t &consts, cc0::gfx::AttributeShader<attr_type, var_attr_size, const_attr_t> shader, cc0::gfx::Rect<int32_t> write_rect)
 {
 	cc0::gfx::Attributes<attr_type, var_attr_size> var;
 
-	write_rect = internal::clip(internal::order(write_rect), Rect{ Point{ 0, 0 }, Point{ dst.width, dst.height } });
+	write_rect = internal::clip(internal::order(write_rect), Rect<int32_t>{ Point<int32_t>{ 0, 0 }, Point<int32_t>{ dst.width, dst.height } });
 
 	// AABB Clipping
 	const int32_t min_y = internal::max(internal::min(a.y, b.y, c.y), write_rect.a.y);
@@ -689,10 +744,10 @@ void cc0::gfx::draw_tri(cc0::gfx::Image &dst, cc0::gfx::Point a, cc0::gfx::Point
 	if (max_x - min_x <= 0) { return; }
 
 	// Triangle setup
-	Point    p    = { min_x, min_y };
-	uint64_t w0_y = internal::determine_halfspace(b, c, p);
-	uint64_t w1_y = internal::determine_halfspace(c, a, p);
-	uint64_t w2_y = internal::determine_halfspace(a, b, p);
+	Point<int32_t> p    = { min_x, min_y };
+	uint64_t       w0_y = internal::determine_halfspace(b, c, p);
+	uint64_t       w1_y = internal::determine_halfspace(c, a, p);
+	uint64_t       w2_y = internal::determine_halfspace(a, b, p);
 
 	// Interpolation/triangle setup
 	const int64_t w2_x_inc = a.y - b.y;
