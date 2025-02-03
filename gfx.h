@@ -662,7 +662,7 @@ namespace cc0
 		/// @param shader The shader tp use to blend colors.
 		/// @param write_rect The area on the destination image that is writeable. All rendering outside this area is discarded. The entire destination image is selected by default. The region is automatically clipped to the maximally allowed dimensions on the destination image.
 		template < typename attr_type, uint32_t var_attr_size, typename const_attr_t >
-		void draw_tri(Image &dst, Point<int32_t> a, Point<int32_t> b, Point<int32_t> c, const Attributes<attr_type, var_attr_size> &a_var, const Attributes<attr_type, var_attr_size> &b_var, const Attributes<attr_type, var_attr_size> &c_var, const const_attr_t &consts, AttributeShader<attr_type, var_attr_size, const_attr_t> shader, Rect<int32_t> write_rect = FULL_RECT);
+		void shade_tri(Image &dst, Point<int32_t> a, Point<int32_t> b, Point<int32_t> c, const Attributes<attr_type, var_attr_size> &a_var, const Attributes<attr_type, var_attr_size> &b_var, const Attributes<attr_type, var_attr_size> &c_var, const const_attr_t &consts, AttributeShader<attr_type, var_attr_size, const_attr_t> shader, Rect<int32_t> write_rect = FULL_RECT);
 
 		/// @brief Namespace for internal functions. Do not use these.
 		namespace internal
@@ -729,7 +729,7 @@ template < uint32_t bits, uint32_t precision > cc0::gfx::fixed<bits,precision> o
 template < uint32_t bits, uint32_t precision > cc0::gfx::fixed<bits,precision> operator/(cc0::gfx::fixed<bits,precision> l, cc0::gfx::fixed<bits,precision> r) { return l /= r; }
 
 template < typename attr_type, uint32_t var_attr_size, typename const_attr_t >
-void cc0::gfx::draw_tri(cc0::gfx::Image &dst, cc0::gfx::Point<int32_t> a, cc0::gfx::Point<int32_t> b, cc0::gfx::Point<int32_t> c, const cc0::gfx::Attributes<attr_type, var_attr_size> &a_var, const cc0::gfx::Attributes<attr_type, var_attr_size> &b_var, const cc0::gfx::Attributes<attr_type, var_attr_size> &c_var, const const_attr_t &consts, cc0::gfx::AttributeShader<attr_type, var_attr_size, const_attr_t> shader, cc0::gfx::Rect<int32_t> write_rect)
+void cc0::gfx::shade_tri(cc0::gfx::Image &dst, cc0::gfx::Point<int32_t> a, cc0::gfx::Point<int32_t> b, cc0::gfx::Point<int32_t> c, const cc0::gfx::Attributes<attr_type, var_attr_size> &a_var, const cc0::gfx::Attributes<attr_type, var_attr_size> &b_var, const cc0::gfx::Attributes<attr_type, var_attr_size> &c_var, const const_attr_t &consts, cc0::gfx::AttributeShader<attr_type, var_attr_size, const_attr_t> shader, cc0::gfx::Rect<int32_t> write_rect)
 {
 	cc0::gfx::Attributes<attr_type, var_attr_size> var;
 

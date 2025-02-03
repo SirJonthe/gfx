@@ -738,8 +738,6 @@ void cc0::gfx::stretch_image(cc0::gfx::Image &dst, cc0::gfx::Rect<int32_t> dst_r
 
 void cc0::gfx::stretch_image(Image &dst, Rect<int32_t> dst_rect, const Image &src, Shader shader, Sampler sampler, Rect<int32_t> src_rect, Rect<int32_t> write_rect)
 {
-	// [ ] We probably need to interpolate normalized texture coordinates because bilinear needs to interpolate 0 - width-1, while nearest needs to interpolate 0 - width.
-
 	write_rect = internal::clip(internal::order(write_rect), Rect<int32_t>{ Point<int32_t>{ 0, 0 }, Point<int32_t>{ dst.width, dst.height } });
 
 	if (src_rect.a.x == src_rect.b.x) { return; }
