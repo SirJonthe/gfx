@@ -719,16 +719,16 @@ void cc0::gfx::stretch_image(cc0::gfx::Image &dst, cc0::gfx::Rect<int32_t> dst_r
 		dst_rect.b.y = write_rect.b.y;
 	}
 
-	for (int32_t dy = dst_rect.a.y, sy = 0; dy < dst_rect.b.y; ++dy, sy += dsy) {
-		for (int32_t dx = dst_rect.a.x, sx = 0; dx < dst_rect.b.x; ++dx, sx += dsx) {
+	for (int32_t dy = dst_rect.a.y, sy = ssy; dy < dst_rect.b.y; ++dy, sy += dsy) {
+		for (int32_t dx = dst_rect.a.x, sx = ssx; dx < dst_rect.b.x; ++dx, sx += dsx) {
 			set_color(
 				dst,
 				Point<int32_t>{ dx, dy },
 				get_color(
 					src,
 					Point<int32_t>{
-						(ssx + sx) >> 15,
-						(ssy + sy) >> 15
+						sx >> 15,
+						sy >> 15
 					}
 				)
 			);
@@ -780,14 +780,14 @@ void cc0::gfx::stretch_image(Image &dst, Rect<int32_t> dst_rect, const Image &sr
 		dst_rect.b.y = write_rect.b.y;
 	}
 
-	for (int32_t dy = dst_rect.a.y, sy = 0; dy < dst_rect.b.y; ++dy, sy += dsy) {
-		for (int32_t dx = dst_rect.a.x, sx = 0; dx < dst_rect.b.x; ++dx, sx += dsx) {
+	for (int32_t dy = dst_rect.a.y, sy = ssy; dy < dst_rect.b.y; ++dy, sy += dsy) {
+		for (int32_t dx = dst_rect.a.x, sx = ssx; dx < dst_rect.b.x; ++dx, sx += dsx) {
 			set_color(
 				dst,
 				Point<int32_t>{ dx, dy },
 				shader(
 					get_color(dst, Point<int32_t>{ dx, dy }),
-					sampler(src, ssx + sx, ssy + sy)
+					sampler(src, sx, sy)
 				)
 			);
 		}
