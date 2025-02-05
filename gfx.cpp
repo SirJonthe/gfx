@@ -696,7 +696,7 @@ void cc0::gfx::stretch_image(cc0::gfx::Image &dst, cc0::gfx::Rect<int32_t> dst_r
 	}
 
 	if (dst_rect.b.x < write_rect.a.x || dst_rect.a.x >= write_rect.b.x) { return; }
-	if (dst_rect.b.y < write_rect.a.x || dst_rect.a.y >= write_rect.b.y) { return; }
+	if (dst_rect.b.y < write_rect.a.y || dst_rect.a.y >= write_rect.b.y) { return; }
 
 	const int32_t dsx = ((src_rect.b.x - src_rect.a.x) << 15) / (dst_rect.b.x - dst_rect.a.x);
 	const int32_t dsy = ((src_rect.b.y - src_rect.a.y) << 15) / (dst_rect.b.y - dst_rect.a.y);
@@ -757,7 +757,7 @@ void cc0::gfx::stretch_image(Image &dst, Rect<int32_t> dst_rect, const Image &sr
 	}
 
 	if (dst_rect.b.x < write_rect.a.x || dst_rect.a.x >= write_rect.b.x) { return; }
-	if (dst_rect.b.y < write_rect.a.x || dst_rect.a.y >= write_rect.b.y) { return; }
+	if (dst_rect.b.y < write_rect.a.y || dst_rect.a.y >= write_rect.b.y) { return; }
 
 	const int32_t dsx = ((src_rect.b.x - src_rect.a.x) << 15) / (dst_rect.b.x - dst_rect.a.x);
 	const int32_t dsy = ((src_rect.b.y - src_rect.a.y) << 15) / (dst_rect.b.y - dst_rect.a.y);
