@@ -1,3 +1,10 @@
+/// @file gfx.cpp
+/// @brief Contains a collection of simple and customizable software graphics rendering routines.
+/// @author github.com/SirJonthe
+/// @date 2025
+/// @copyright Public domain.
+/// @license CC0 1.0
+
 #include "gfx.h"
 
 #define FONT_ATLAS_CHAR_WIDTH_COUNT   1 // The number of glyphs in the atlas in the X axis.
@@ -76,27 +83,27 @@ static uint8_t FONT_ATLAS[] = { // The font bits as 1 bit per pixel.
 	0x3e, 0x3e, 0x3e, 0x00
 };
 
-cc0::gfx::Rect<int32_t> cc0::gfx::internal::order(cc0::gfx::Rect<int32_t> r)
+cc0::gfx::Rect<int32_t> cc0::gfx::gfx_internal::order(cc0::gfx::Rect<int32_t> r)
 {
-	if (r.a.x > r.b.x) { cc0::gfx::internal::swap(r.a.x, r.b.x); }
-	if (r.a.y > r.b.y) { cc0::gfx::internal::swap(r.a.y, r.b.x); }
+	if (r.a.x > r.b.x) { cc0::gfx::gfx_internal::swap(r.a.x, r.b.x); }
+	if (r.a.y > r.b.y) { cc0::gfx::gfx_internal::swap(r.a.y, r.b.x); }
 	return r;
 }
 
-cc0::gfx::Rect<int32_t> cc0::gfx::internal::clip(cc0::gfx::Rect<int32_t> a, cc0::gfx::Rect<int32_t> b)
+cc0::gfx::Rect<int32_t> cc0::gfx::gfx_internal::clip(cc0::gfx::Rect<int32_t> a, cc0::gfx::Rect<int32_t> b)
 {
 	return cc0::gfx::Rect<int32_t>{
-		cc0::gfx::Point<int32_t>{ cc0::gfx::internal::max(a.a.x, b.a.x), cc0::gfx::internal::max(a.a.y, b.a.y) },
-		cc0::gfx::Point<int32_t>{ cc0::gfx::internal::min(a.b.x, b.b.x), cc0::gfx::internal::min(a.b.y, b.b.y) }
+		cc0::gfx::Point<int32_t>{ cc0::gfx::gfx_internal::max(a.a.x, b.a.x), cc0::gfx::gfx_internal::max(a.a.y, b.a.y) },
+		cc0::gfx::Point<int32_t>{ cc0::gfx::gfx_internal::min(a.b.x, b.b.x), cc0::gfx::gfx_internal::min(a.b.y, b.b.y) }
 	};
 }
 
-uint64_t cc0::gfx::internal::determine_halfspace(cc0::gfx::Point<int32_t> a, cc0::gfx::Point<int32_t> b, cc0::gfx::Point<int32_t> point)
+uint64_t cc0::gfx::gfx_internal::determine_halfspace(cc0::gfx::Point<int32_t> a, cc0::gfx::Point<int32_t> b, cc0::gfx::Point<int32_t> point)
 {
 	return uint64_t(b.x - a.x) * uint64_t(point.y - a.y) - uint64_t(b.y - a.y) * uint64_t(point.x - a.x);
 }
 
-bool cc0::gfx::internal::is_top_left(cc0::gfx::Point<int32_t> a, cc0::gfx::Point<int32_t> b)
+bool cc0::gfx::gfx_internal::is_top_left(cc0::gfx::Point<int32_t> a, cc0::gfx::Point<int32_t> b)
 {
 	// strictly connected to winding order
 	return (a.x < b.x && b.y == a.y) || (a.y > b.y);
@@ -578,8 +585,8 @@ void cc0::gfx::set_color(cc0::gfx::Image &dst, cc0::gfx::Point<int32_t> p, cc0::
 
 void cc0::gfx::fill_rect(cc0::gfx::Image &dst, cc0::gfx::Rect<int32_t> dst_rect, cc0::gfx::RGBA32 color, cc0::gfx::Shader shader, Rect<int32_t> write_rect)
 {
-	write_rect = internal::clip(internal::order(write_rect), Rect<int32_t>{ Point<int32_t>{ 0, 0 }, Point<int32_t>{ dst.width, dst.height } });
-	dst_rect = internal::clip(internal::order(dst_rect), write_rect);
+	write_rect = gfx_internal::clip(gfx_internal::order(write_rect), Rect<int32_t>{ Point<int32_t>{ 0, 0 }, Point<int32_t>{ dst.width, dst.height } });
+	dst_rect = gfx_internal::clip(gfx_internal::order(dst_rect), write_rect);
 	for (int32_t y = dst_rect.a.y; y < dst_rect.b.y; ++y) {
 		for (int32_t x = dst_rect.a.x; x < dst_rect.b.x; ++x) {
 			const Point<int32_t> p = { x, y };
@@ -677,22 +684,22 @@ void cc0::gfx::draw_line(cc0::gfx::Image &pDst, int32_t pX1, int32_t pY1, cc0::g
 
 void cc0::gfx::stretch_image(cc0::gfx::Image &dst, cc0::gfx::Rect<int32_t> dst_rect, const cc0::gfx::Image &src, cc0::gfx::Rect<int32_t> src_rect, cc0::gfx::Rect<int32_t> write_rect)
 {
-	write_rect = internal::clip(internal::order(write_rect), Rect<int32_t>{ Point<int32_t>{ 0, 0 }, Point<int32_t>{ dst.width, dst.height } });
+	write_rect = gfx_internal::clip(gfx_internal::order(write_rect), Rect<int32_t>{ Point<int32_t>{ 0, 0 }, Point<int32_t>{ dst.width, dst.height } });
 
 	if (src_rect.a.x == src_rect.b.x) { return; }
 	if (src_rect.a.y == src_rect.b.y) { return; }
 	if (dst_rect.a.x == dst_rect.b.x) { return; }
 	if (dst_rect.a.y == dst_rect.b.y) { return; }
 
-	src_rect = internal::clip(src_rect, Rect<int32_t>{ Point<int32_t>{ 0, 0 }, Point<int32_t>{ src.width, src.height } });
+	src_rect = gfx_internal::clip(src_rect, Rect<int32_t>{ Point<int32_t>{ 0, 0 }, Point<int32_t>{ src.width, src.height } });
 
 	if (dst_rect.a.x > dst_rect.b.x) {
-		internal::swap(dst_rect.a.x, dst_rect.b.x);
-		internal::swap(src_rect.a.x, src_rect.b.x);
+		gfx_internal::swap(dst_rect.a.x, dst_rect.b.x);
+		gfx_internal::swap(src_rect.a.x, src_rect.b.x);
 	}
 	if (dst_rect.a.y > dst_rect.b.y) {
-		internal::swap(dst_rect.a.y, dst_rect.b.y);
-		internal::swap(src_rect.a.y, src_rect.b.y);
+		gfx_internal::swap(dst_rect.a.y, dst_rect.b.y);
+		gfx_internal::swap(src_rect.a.y, src_rect.b.y);
 	}
 
 	if (dst_rect.b.x < write_rect.a.x || dst_rect.a.x >= write_rect.b.x) { return; }
@@ -701,7 +708,7 @@ void cc0::gfx::stretch_image(cc0::gfx::Image &dst, cc0::gfx::Rect<int32_t> dst_r
 	const int32_t dsx = ((src_rect.b.x - src_rect.a.x) << 15) / (dst_rect.b.x - dst_rect.a.x);
 	const int32_t dsy = ((src_rect.b.y - src_rect.a.y) << 15) / (dst_rect.b.y - dst_rect.a.y);
 
-	int32_t ssx = dsx >= 0 ? (internal::min(src_rect.a.x, src_rect.b.x) << 15) : ((internal::max(src_rect.a.x, src_rect.b.x) << 15) + dsx);
+	int32_t ssx = dsx >= 0 ? (gfx_internal::min(src_rect.a.x, src_rect.b.x) << 15) : ((gfx_internal::max(src_rect.a.x, src_rect.b.x) << 15) + dsx);
 	if (dst_rect.a.x < write_rect.a.x) {
 		ssx += dsx * (write_rect.a.x - dst_rect.a.x);
 		dst_rect.a.x = write_rect.a.x;
@@ -710,7 +717,7 @@ void cc0::gfx::stretch_image(cc0::gfx::Image &dst, cc0::gfx::Rect<int32_t> dst_r
 		dst_rect.b.x = write_rect.b.x;
 	}
 
-	int32_t ssy = dsy >= 0 ? (internal::min(src_rect.a.y, src_rect.b.y) << 15) : ((internal::max(src_rect.a.y, src_rect.b.y) << 15) + dsy);
+	int32_t ssy = dsy >= 0 ? (gfx_internal::min(src_rect.a.y, src_rect.b.y) << 15) : ((gfx_internal::max(src_rect.a.y, src_rect.b.y) << 15) + dsy);
 	if (dst_rect.a.y < write_rect.a.y) {
 		ssy += dsy * (write_rect.a.y - dst_rect.a.y);
 		dst_rect.a.y = write_rect.a.y;
@@ -738,22 +745,22 @@ void cc0::gfx::stretch_image(cc0::gfx::Image &dst, cc0::gfx::Rect<int32_t> dst_r
 
 void cc0::gfx::stretch_image(Image &dst, Rect<int32_t> dst_rect, const Image &src, Shader shader, Sampler sampler, Rect<int32_t> src_rect, Rect<int32_t> write_rect)
 {
-	write_rect = internal::clip(internal::order(write_rect), Rect<int32_t>{ Point<int32_t>{ 0, 0 }, Point<int32_t>{ dst.width, dst.height } });
+	write_rect = gfx_internal::clip(gfx_internal::order(write_rect), Rect<int32_t>{ Point<int32_t>{ 0, 0 }, Point<int32_t>{ dst.width, dst.height } });
 
 	if (src_rect.a.x == src_rect.b.x) { return; }
 	if (src_rect.a.y == src_rect.b.y) { return; }
 	if (dst_rect.a.x == dst_rect.b.x) { return; }
 	if (dst_rect.a.y == dst_rect.b.y) { return; }
 
-	src_rect = internal::clip(src_rect, Rect<int32_t>{ Point<int32_t>{ 0, 0 }, Point<int32_t>{ src.width, src.height } });
+	src_rect = gfx_internal::clip(src_rect, Rect<int32_t>{ Point<int32_t>{ 0, 0 }, Point<int32_t>{ src.width, src.height } });
 
 	if (dst_rect.a.x > dst_rect.b.x) {
-		internal::swap(dst_rect.a.x, dst_rect.b.x);
-		internal::swap(src_rect.a.x, src_rect.b.x);
+		gfx_internal::swap(dst_rect.a.x, dst_rect.b.x);
+		gfx_internal::swap(src_rect.a.x, src_rect.b.x);
 	}
 	if (dst_rect.a.y > dst_rect.b.y) {
-		internal::swap(dst_rect.a.y, dst_rect.b.y);
-		internal::swap(src_rect.a.y, src_rect.b.y);
+		gfx_internal::swap(dst_rect.a.y, dst_rect.b.y);
+		gfx_internal::swap(src_rect.a.y, src_rect.b.y);
 	}
 
 	if (dst_rect.b.x < write_rect.a.x || dst_rect.a.x >= write_rect.b.x) { return; }
@@ -762,7 +769,7 @@ void cc0::gfx::stretch_image(Image &dst, Rect<int32_t> dst_rect, const Image &sr
 	const int32_t dsx = ((src_rect.b.x - src_rect.a.x) << 15) / (dst_rect.b.x - dst_rect.a.x);
 	const int32_t dsy = ((src_rect.b.y - src_rect.a.y) << 15) / (dst_rect.b.y - dst_rect.a.y);
 
-	int32_t ssx = dsx >= 0 ? (internal::min(src_rect.a.x, src_rect.b.x) << 15) : ((internal::max(src_rect.a.x, src_rect.b.x) << 15) + dsx);
+	int32_t ssx = dsx >= 0 ? (gfx_internal::min(src_rect.a.x, src_rect.b.x) << 15) : ((gfx_internal::max(src_rect.a.x, src_rect.b.x) << 15) + dsx);
 	if (dst_rect.a.x < write_rect.a.x) {
 		ssx += dsx * (write_rect.a.x - dst_rect.a.x);
 		dst_rect.a.x = write_rect.a.x;
@@ -771,7 +778,7 @@ void cc0::gfx::stretch_image(Image &dst, Rect<int32_t> dst_rect, const Image &sr
 		dst_rect.b.x = write_rect.b.x;
 	}
 
-	int32_t ssy = dsy >= 0 ? (internal::min(src_rect.a.y, src_rect.b.y) << 15) : ((internal::max(src_rect.a.y, src_rect.b.y) << 15) + dsy);
+	int32_t ssy = dsy >= 0 ? (gfx_internal::min(src_rect.a.y, src_rect.b.y) << 15) : ((gfx_internal::max(src_rect.a.y, src_rect.b.y) << 15) + dsy);
 	if (dst_rect.a.y < write_rect.a.y) {
 		ssy += dsy * (write_rect.a.y - dst_rect.a.y);
 		dst_rect.a.y = write_rect.a.y;
@@ -798,16 +805,16 @@ void cc0::gfx::stretch_image(Image &dst, Rect<int32_t> dst_rect, const Image &sr
 
 void cc0::gfx::fill_span(cc0::gfx::Image &dst, int32_t dst_axis, cc0::gfx::Span<int32_t> dst_span, cc0::gfx::RGBA32 color, cc0::gfx::Shader shader, cc0::gfx::Rect<int32_t> write_rect)
 {
-	write_rect = internal::clip(internal::order(write_rect), Rect<int32_t>{ Point<int32_t>{ 0, 0 }, Point<int32_t>{ dst.width, dst.height } });
+	write_rect = gfx_internal::clip(gfx_internal::order(write_rect), Rect<int32_t>{ Point<int32_t>{ 0, 0 }, Point<int32_t>{ dst.width, dst.height } });
 
 	const int32_t fixed_axis = (dst_span.axis + 1) & 1;
 	const int32_t float_axis = dst_span.axis & 1;
 
 	if (dst_axis < arr(write_rect.a)[fixed_axis] || dst_axis >= arr(write_rect.b)[fixed_axis]) { return; }
 
-	if (dst_span.a > dst_span.b) { internal::swap(dst_span.a, dst_span.b); }
-	dst_span.a = internal::max(dst_span.a, arr(write_rect.a)[float_axis]);
-	dst_span.b = internal::min(dst_span.b, arr(write_rect.b)[float_axis]);
+	if (dst_span.a > dst_span.b) { gfx_internal::swap(dst_span.a, dst_span.b); }
+	dst_span.a = gfx_internal::max(dst_span.a, arr(write_rect.a)[float_axis]);
+	dst_span.b = gfx_internal::min(dst_span.b, arr(write_rect.b)[float_axis]);
 
 	Point<int32_t> p = {
 		fixed_axis == 0 ? dst_axis : dst_span.a,
@@ -820,7 +827,7 @@ void cc0::gfx::fill_span(cc0::gfx::Image &dst, int32_t dst_axis, cc0::gfx::Span<
 
 void cc0::gfx::stretch_span(cc0::gfx::Image &dst, int32_t dst_axis, cc0::gfx::Span<int32_t> dst_span, const cc0::gfx::Image &src, cc0::gfx::Shader shader, cc0::gfx::Sampler sampler, int32_t src_axis, cc0::gfx::Span<int32_t> src_span, cc0::gfx::Rect<int32_t> write_rect)
 {
-	write_rect = internal::clip(internal::order(write_rect), Rect<int32_t>{ Point<int32_t>{ 0, 0 }, Point<int32_t>{ dst.width, dst.height } });
+	write_rect = gfx_internal::clip(gfx_internal::order(write_rect), Rect<int32_t>{ Point<int32_t>{ 0, 0 }, Point<int32_t>{ dst.width, dst.height } });
 
 	const int32_t d_fixed_axis = (dst_span.axis + 1) & 1;
 	const int32_t d_float_axis = dst_span.axis & 1;
@@ -828,8 +835,8 @@ void cc0::gfx::stretch_span(cc0::gfx::Image &dst, int32_t dst_axis, cc0::gfx::Sp
 	if (dst_axis < arr(write_rect.a)[d_fixed_axis] || dst_axis >= arr(write_rect.b)[d_fixed_axis]) { return; }
 
 	if (dst_span.a > dst_span.b) {
-		internal::swap(dst_span.a, dst_span.b);
-		internal::swap(src_span.a, src_span.b);
+		gfx_internal::swap(dst_span.a, dst_span.b);
+		gfx_internal::swap(src_span.a, src_span.b);
 	}
 
 	const int32_t s_fixed_axis = (src_span.axis + 1) & 1;
@@ -846,7 +853,7 @@ void cc0::gfx::stretch_span(cc0::gfx::Image &dst, int32_t dst_axis, cc0::gfx::Sp
 		arr(s)[s_float_axis] += dss * (write_rect.a.y - dst_span.a);
 		dst_span.a = write_rect.a.y;
 	}
-	dst_span.b = internal::min(dst_span.b, write_rect.b.y);
+	dst_span.b = gfx_internal::min(dst_span.b, write_rect.b.y);
 
 	Point<int32_t> p = {
 		d_fixed_axis == 0 ? dst_axis : dst_span.a,
@@ -859,7 +866,7 @@ void cc0::gfx::stretch_span(cc0::gfx::Image &dst, int32_t dst_axis, cc0::gfx::Sp
 
 void cc0::gfx::stretch_span(cc0::gfx::Image &dst, int32_t dst_axis, cc0::gfx::Span<int32_t> dst_span, const cc0::gfx::Image &src, cc0::gfx::Shader shader, cc0::gfx::Sampler sampler, cc0::gfx::Line<fixed32_t> src_line, cc0::gfx::Rect<int32_t> write_rect)
 {
-	write_rect = internal::clip(internal::order(write_rect), Rect<int32_t>{ Point<int32_t>{ 0, 0 }, Point<int32_t>{ dst.width, dst.height } });
+	write_rect = gfx_internal::clip(gfx_internal::order(write_rect), Rect<int32_t>{ Point<int32_t>{ 0, 0 }, Point<int32_t>{ dst.width, dst.height } });
 
 	const int32_t fixed_axis = (dst_span.axis + 1) & 1;
 	const int32_t float_axis = dst_span.axis & 1;
@@ -867,8 +874,8 @@ void cc0::gfx::stretch_span(cc0::gfx::Image &dst, int32_t dst_axis, cc0::gfx::Sp
 	if (dst_axis < arr(write_rect.a)[fixed_axis] || dst_axis >= arr(write_rect.b)[fixed_axis]) { return; }
 
 	if (dst_span.a > dst_span.b) {
-		internal::swap(dst_span.a, dst_span.b);
-		internal::swap(src_line.a, src_line.b);
+		gfx_internal::swap(dst_span.a, dst_span.b);
+		gfx_internal::swap(src_line.a, src_line.b);
 	}
 
 	const int32_t dsx = ((src_line.b.x - src_line.a.x) << 15) / (dst_span.b - dst_span.a);
@@ -884,7 +891,7 @@ void cc0::gfx::stretch_span(cc0::gfx::Image &dst, int32_t dst_axis, cc0::gfx::Sp
 		s.y += dsy * (write_rect.a.y - dst_span.a);
 		dst_span.a = write_rect.a.y;
 	}
-	dst_span.b = internal::min(dst_span.b, write_rect.b.y);
+	dst_span.b = gfx_internal::min(dst_span.b, write_rect.b.y);
 
 	Point<int32_t> p = {
 		fixed_axis == 0 ? dst_axis : dst_span.a,
@@ -1049,21 +1056,21 @@ int32_t cc0::gfx::print_text(cc0::gfx::Image &dst, cc0::gfx::Point<int32_t> p, c
 
 void cc0::gfx::fill_tri(cc0::gfx::Image &dst, cc0::gfx::Point<int32_t> a, cc0::gfx::Point<int32_t> b, cc0::gfx::Point<int32_t> c, cc0::gfx::RGBA32 color, cc0::gfx::Shader shader, cc0::gfx::Rect<int32_t> write_rect)
 {
-	write_rect = internal::clip(internal::order(write_rect), Rect<int32_t>{ Point<int32_t>{ 0, 0 }, Point<int32_t>{ dst.width, dst.height } });
+	write_rect = gfx_internal::clip(gfx_internal::order(write_rect), Rect<int32_t>{ Point<int32_t>{ 0, 0 }, Point<int32_t>{ dst.width, dst.height } });
 
 	// AABB Clipping
-	const int32_t min_y = internal::max(internal::min(a.y, b.y, c.y), write_rect.a.y);
-	const int32_t max_y = internal::min(internal::max(a.y, b.y, c.y), write_rect.b.y - 1);
+	const int32_t min_y = gfx_internal::max(gfx_internal::min(a.y, b.y, c.y), write_rect.a.y);
+	const int32_t max_y = gfx_internal::min(gfx_internal::max(a.y, b.y, c.y), write_rect.b.y - 1);
 	if (max_y - min_y <= 0) { return; }
-	const int32_t min_x = internal::max(internal::min(a.x, b.x, c.x), write_rect.a.x);
-	const int32_t max_x = internal::min(internal::max(a.x, b.x, c.x), write_rect.b.x - 1);
+	const int32_t min_x = gfx_internal::max(gfx_internal::min(a.x, b.x, c.x), write_rect.a.x);
+	const int32_t max_x = gfx_internal::min(gfx_internal::max(a.x, b.x, c.x), write_rect.b.x - 1);
 	if (max_x - min_x <= 0) { return; }
 
 	// Triangle setup
 	Point<int32_t> p    = { min_x, min_y };
-	int64_t        w0_y = internal::determine_halfspace(b, c, p) + (int64_t(internal::is_top_left(b, c)) - 1);
-	int64_t        w1_y = internal::determine_halfspace(c, a, p) + (int64_t(internal::is_top_left(c, a)) - 1);
-	int64_t        w2_y = internal::determine_halfspace(a, b, p) + (int64_t(internal::is_top_left(a, b)) - 1);
+	int64_t        w0_y = gfx_internal::determine_halfspace(b, c, p) + (int64_t(gfx_internal::is_top_left(b, c)) - 1);
+	int64_t        w1_y = gfx_internal::determine_halfspace(c, a, p) + (int64_t(gfx_internal::is_top_left(c, a)) - 1);
+	int64_t        w2_y = gfx_internal::determine_halfspace(a, b, p) + (int64_t(gfx_internal::is_top_left(a, b)) - 1);
 
 	// Interpolation/triangle setup
 	const int32_t w2_x_inc = a.y - b.y;

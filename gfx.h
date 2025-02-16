@@ -1,3 +1,10 @@
+/// @file gfx.h
+/// @brief Contains a collection of simple and customizable software graphics rendering routines.
+/// @author github.com/SirJonthe
+/// @date 2025
+/// @copyright Public domain.
+/// @license CC0 1.0
+
 #ifndef CC0_GFX_H_INCLUDED__
 #define CC0_GFX_H_INCLUDED__
 
@@ -10,7 +17,7 @@ namespace cc0
 	namespace gfx
 	{
 		/// @brief Namespace for internal functions. Do not use these.
-		namespace internal
+		namespace gfx_internal
 		{
 			template < uint32_t bits > struct intinfo {};
 
@@ -58,7 +65,7 @@ namespace cc0
 		template < uint32_t bits, uint32_t precision >
 		struct fixed
 		{
-			typename internal::intinfo<bits>::int_t x; // The binary representation of the fixed-point number.
+			typename gfx_internal::intinfo<bits>::int_t x; // The binary representation of the fixed-point number.
 
 			/// @brief The default constructor. Does nothing, and does not initialize the instance.
 			fixed( void ) = default;
@@ -74,10 +81,10 @@ namespace cc0
 
 			/// @brief A conversion constructor that converts an integer into a fixed-point number by upscaling it.
 			/// @param n The number to upscale into a fixed-point number.
-			fixed(typename internal::intinfo<bits>::int_t n) : x(n << precision) {}
+			fixed(typename gfx_internal::intinfo<bits>::int_t n) : x(n << precision) {}
 
 			/// @brief A conversion operator converting the fixed-point number into an integer by downscaling it.
-			operator typename internal::intinfo<bits>::int_t( void ) { return x >> precision; }
+			operator typename gfx_internal::intinfo<bits>::int_t( void ) { return x >> precision; }
 
 			/// @brief Addition.
 			/// @param r The right-hand side operator.
@@ -93,7 +100,7 @@ namespace cc0
 			/// @param r The right-hand side operator.
 			/// @return The result.
 			fixed &operator*=(fixed r) {
-				typename internal::intinfo<bits>::next::int_t n = typename internal::intinfo<bits>::next::int_t(x) * r.x;
+				typename gfx_internal::intinfo<bits>::next::int_t n = typename gfx_internal::intinfo<bits>::next::int_t(x) * r.x;
 				x = (n.x >> precision);
 				return *this;
 			}
@@ -102,7 +109,7 @@ namespace cc0
 			/// @param r The right-hand side operator.
 			/// @return The result.
 			fixed &operator/=(fixed r) {
-				x = (typename internal::intinfo<bits>::next::int_t(x) << precision) / r.x;
+				x = (typename gfx_internal::intinfo<bits>::next::int_t(x) << precision) / r.x;
 				return *this;
 			}
 		};
@@ -665,7 +672,7 @@ namespace cc0
 		void shade_tri(Image &dst, Point<int32_t> a, Point<int32_t> b, Point<int32_t> c, const Attributes<attr_type, var_attr_size> &a_var, const Attributes<attr_type, var_attr_size> &b_var, const Attributes<attr_type, var_attr_size> &c_var, const const_attr_t &consts, AttributeShader<attr_type, var_attr_size, const_attr_t> shader, Rect<int32_t> write_rect = FULL_RECT);
 
 		/// @brief Namespace for internal functions. Do not use these.
-		namespace internal
+		namespace gfx_internal
 		{
 			template < typename type_t >
 			void swap(type_t &a, type_t &b);
@@ -733,21 +740,21 @@ void cc0::gfx::shade_tri(cc0::gfx::Image &dst, cc0::gfx::Point<int32_t> a, cc0::
 {
 	cc0::gfx::Attributes<attr_type, var_attr_size> var;
 
-	write_rect = internal::clip(internal::order(write_rect), Rect<int32_t>{ Point<int32_t>{ 0, 0 }, Point<int32_t>{ dst.width, dst.height } });
+	write_rect = gfx_internal::clip(gfx_internal::order(write_rect), Rect<int32_t>{ Point<int32_t>{ 0, 0 }, Point<int32_t>{ dst.width, dst.height } });
 
 	// AABB Clipping
-	const int32_t min_y = internal::max(internal::min(a.y, b.y, c.y), write_rect.a.y);
-	const int32_t max_y = internal::min(internal::max(a.y, b.y, c.y), write_rect.b.y - 1);
+	const int32_t min_y = gfx_internal::max(gfx_internal::min(a.y, b.y, c.y), write_rect.a.y);
+	const int32_t max_y = gfx_internal::min(gfx_internal::max(a.y, b.y, c.y), write_rect.b.y - 1);
 	if (max_y - min_y <= 0) { return; }
-	const int32_t min_x = internal::max(internal::min(a.x, b.x, c.x), write_rect.a.x);
-	const int32_t max_x = internal::min(internal::max(a.x, b.x, c.x), write_rect.b.x - 1);
+	const int32_t min_x = gfx_internal::max(gfx_internal::min(a.x, b.x, c.x), write_rect.a.x);
+	const int32_t max_x = gfx_internal::min(gfx_internal::max(a.x, b.x, c.x), write_rect.b.x - 1);
 	if (max_x - min_x <= 0) { return; }
 
 	// Triangle setup
 	Point<int32_t> p    = { min_x, min_y };
-	uint64_t       w0_y = internal::determine_halfspace(b, c, p);
-	uint64_t       w1_y = internal::determine_halfspace(c, a, p);
-	uint64_t       w2_y = internal::determine_halfspace(a, b, p);
+	uint64_t       w0_y = gfx_internal::determine_halfspace(b, c, p);
+	uint64_t       w1_y = gfx_internal::determine_halfspace(c, a, p);
+	uint64_t       w2_y = gfx_internal::determine_halfspace(a, b, p);
 
 	// Interpolation/triangle setup
 	const int64_t w2_x_inc = a.y - b.y;
@@ -768,9 +775,9 @@ void cc0::gfx::shade_tri(cc0::gfx::Image &dst, cc0::gfx::Point<int32_t> a, cc0::
 	const int64_t l1_y_inc        = w1_y_inc * sum_inv_area_x2;
 	const int64_t l2_y_inc        = w2_y_inc * sum_inv_area_x2;
 
-	w0_y += internal::is_top_left(b, c) ? 0 : -1;
-	w1_y += internal::is_top_left(c, a) ? 0 : -1;
-	w2_y += internal::is_top_left(a, b) ? 0 : -1;
+	w0_y += gfx_internal::is_top_left(b, c) ? 0 : -1;
+	w1_y += gfx_internal::is_top_left(c, a) ? 0 : -1;
+	w2_y += gfx_internal::is_top_left(a, b) ? 0 : -1;
 
 	for (p.y = min_y; p.y <= max_y; ++p.y) {
 
@@ -811,7 +818,7 @@ void cc0::gfx::shade_tri(cc0::gfx::Image &dst, cc0::gfx::Point<int32_t> a, cc0::
 }
 
 template < typename type_t >
-void cc0::gfx::internal::swap(type_t &a, type_t &b)
+void cc0::gfx::gfx_internal::swap(type_t &a, type_t &b)
 {
 	type_t t = a;
 	a = b;
@@ -819,33 +826,33 @@ void cc0::gfx::internal::swap(type_t &a, type_t &b)
 }
 
 template < typename type_t >
-type_t cc0::gfx::internal::min(type_t a, type_t b)
+type_t cc0::gfx::gfx_internal::min(type_t a, type_t b)
 {
 	return a < b ? a : b;
 }
 
 template < typename type_t >
-type_t cc0::gfx::internal::min(type_t a, type_t b, type_t c)
+type_t cc0::gfx::gfx_internal::min(type_t a, type_t b, type_t c)
 {
-	return cc0::gfx::internal::min(a, cc0::gfx::internal::min(b, c));
+	return cc0::gfx::gfx_internal::min(a, cc0::gfx::gfx_internal::min(b, c));
 }
 
 template < typename type_t >
-type_t cc0::gfx::internal::max(type_t a, type_t b)
+type_t cc0::gfx::gfx_internal::max(type_t a, type_t b)
 {
 	return a > b ? a : b;
 }
 
 template < typename type_t >
-type_t cc0::gfx::internal::max(type_t a, type_t b, type_t c)
+type_t cc0::gfx::gfx_internal::max(type_t a, type_t b, type_t c)
 {
-	return cc0::gfx::internal::max(a, cc0::gfx::internal::max(b, c));
+	return cc0::gfx::gfx_internal::max(a, cc0::gfx::gfx_internal::max(b, c));
 }
 
 template < typename type_t >
-type_t cc0::gfx::internal::clamp(type_t min, type_t x, type_t max)
+type_t cc0::gfx::gfx_internal::clamp(type_t min, type_t x, type_t max)
 {
-	return cc0::gfx::internal::max(min, cc0::gfx::internal::min(x, max));
+	return cc0::gfx::gfx_internal::max(min, cc0::gfx::gfx_internal::min(x, max));
 }
 
 #endif
