@@ -297,8 +297,7 @@ Using render masks may be more limited than rendering on separate surfaces when 
 `gfx` does not ship with the ability to display the graphics that are rendered to a surface for reasons of complete platform agnosticism and portability. Instead, the user must either implement or provide the necessary API calls to output the rendering results themselves.
 
 ## TODO
-- [ ] blit_image implementation - more lightweight than stretch_image
-- [ ] Replace scaled integers with fixed in samplers, and shaders
+- [ ] Replace scaled integers with fixed in samplers and shaders
 - [ ] Add special functionality when interpolating float, fixed, and int
 - [ ] Perspective correct triangle
 - [ ] shade_rect interpolates custom attributes and has a constant structure argument
